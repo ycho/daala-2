@@ -46,6 +46,7 @@ static double rint(double x) {
   return (int)(x < 0 ? x - 0.5 : x + 0.5);
 }
 #endif
+#include "../src/thor_simd.h"
 
 typedef struct av_input av_input;
 
@@ -480,6 +481,7 @@ int main(int argc, char **argv) {
 #endif
   outfile = stdout;
   memset(&avin, 0, sizeof(avin));
+  init_use_simd();
   avin.video_fps_n = -1;
   avin.video_fps_d = -1;
   avin.video_par_n = -1;
