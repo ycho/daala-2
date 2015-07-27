@@ -46,7 +46,7 @@ static double rint(double x) {
   return (int)(x < 0 ? x - 0.5 : x + 0.5);
 }
 #endif
-#include "../src/thor_simd.h"
+#include "../src/thor/thor_simd.h"
 
 typedef struct av_input av_input;
 

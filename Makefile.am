@@ -39,19 +39,19 @@ noinst_HEADERS = \
 	src/x86/x86enc.h \
 	src/x86/x86dct.h \
 	src/x86/x86int.h \
-	src/thor_global.h \
-	src/thor_common_kernels.h \
-	src/thor_common_block.h \
-	src/thor_simd.h \
-	src/thor_types.h \
-	src/thor_simd/v128_intrinsics_arm.h \
-	src/thor_simd/v128_intrinsics_c.h \
-	src/thor_simd/v128_intrinsics_x86.h \
-	src/thor_simd/v128_intrinsics.h \
-	src/thor_simd/v64_intrinsics_arm.h \
-	src/thor_simd/v64_intrinsics_c.h \
-	src/thor_simd/v64_intrinsics_x86.h \
-	src/thor_simd/v64_intrinsics.h
+	src/thor/thor_global.h \
+	src/thor/thor_common_kernels.h \
+	src/thor/thor_common_block.h \
+	src/thor/thor_simd.h \
+	src/thor/thor_types.h \
+	src/thor/thor_simd/v128_intrinsics_arm.h \
+	src/thor/thor_simd/v128_intrinsics_c.h \
+	src/thor/thor_simd/v128_intrinsics_x86.h \
+	src/thor/thor_simd/v128_intrinsics.h \
+	src/thor/thor_simd/v64_intrinsics_arm.h \
+	src/thor/thor_simd/v64_intrinsics_c.h \
+	src/thor/thor_simd/v64_intrinsics_x86.h \
+	src/thor/thor_simd/v64_intrinsics.h
 
 src_dct_SOURCES = src/dct.c src/internal.c
 if ENABLE_X86ASM
@@ -104,9 +104,9 @@ src_libdaalabase_la_SOURCES = \
 	src/zigzag16.c \
 	src/zigzag32.c \
 	src/zigzag64.c \
-	src/thor_common_kernels.c \
-	src/thor_inter_pred.c \
-	src/thor_simd.c \
+	src/thor/thor_common_kernels.c \
+	src/thor/thor_inter_pred.c \
+	src/thor/thor_simd.c \
 	$(src_dct_SOURCES)
 if ENABLE_X86ASM
 src_libdaalabase_la_SOURCES += \

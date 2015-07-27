@@ -72,7 +72,7 @@ static const int8_t filter_coeffsC[8][4] = {
     {-2, 10, 58, -2}
 };
 
-void get_inter_prediction_chroma(uint8_t *pblock, uint8_t *ref, int width, int height, int stride, int pstride,
+void thor_get_inter_prediction_chroma(uint8_t *pblock, uint8_t *ref, int width, int height, int stride, int pstride,
  int32_t mvx, int32_t mvy)
 {
   int i,j;
@@ -123,7 +123,8 @@ void get_inter_prediction_chroma(uint8_t *pblock, uint8_t *ref, int width, int h
   }
 }
 
-void get_inter_prediction_luma(uint8_t *pblock, uint8_t *ref, int width, int height, int stride, int pstride, int32_t mvx, int32_t mvy)
+void thor_get_inter_prediction_luma(uint8_t *pblock, uint8_t *ref, int width, int height, int stride, int pstride,
+ int32_t mvx, int32_t mvy)
 {
   int i,j;
 
