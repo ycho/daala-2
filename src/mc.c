@@ -198,9 +198,13 @@ void od_mc_predict1fmv8_c(unsigned char *dst, const unsigned char *src,
 
 static void od_mc_predict1fmv8(od_state *state, unsigned char *dst,
  const unsigned char *src, int systride, int32_t mvx, int32_t mvy,
- int log_xblk_sz, int log_yblk_sz) {
-  (*state->opt_vtbl.mc_predict1fmv8)(dst, src, systride, mvx, mvy,
-   log_xblk_sz, log_yblk_sz);
+ int log_xblk_sz, int log_yblk_sz, int subsampled_plane) {
+  if (subsampled_plane)
+    (*state->opt_vtbl.mc_predict1fmv8)(dst, src, systride, mvx, mvy,
+     log_xblk_sz, log_yblk_sz);
+  else
+    (*state->opt_vtbl.mc_predict1fmv8)(dst, src, systride, mvx, mvy,
+     log_xblk_sz, log_yblk_sz);
 }
 
 /*Perform normal bilinear blending.*/
@@ -2414,23 +2418,24 @@ void od_mc_predict8(od_state *state, unsigned char *dst, int dystride,
  int oc, /* Index of outside corner. */
  int s, /* Two split flags that indicate if the corners are split. */
  int log_xblk_sz,   /* Log 2 of block size. */
- int log_yblk_sz
+ int log_yblk_sz,
+ int subsampled_plane /*Either xdec or ydec is not zero, then 1.*/
 ) {
   const unsigned char *pred[4];
   od_mc_predict1fmv8(state, state->mc_buf[0], src, systride,
-   mvx[0], mvy[0], log_xblk_sz, log_yblk_sz);
+   mvx[0], mvy[0], log_xblk_sz, log_yblk_sz, subsampled_plane);
   pred[0] = state->mc_buf[0];
   if (mvx[1] == mvx[0] && mvy[1] == mvy[0]) pred[1] = pred[0];
   else {
     od_mc_predict1fmv8(state, state->mc_buf[1], src, systride,
-     mvx[1], mvy[1], log_xblk_sz, log_yblk_sz);
+     mvx[1], mvy[1], log_xblk_sz, log_yblk_sz, subsampled_plane);
     pred[1] = state->mc_buf[1];
   }
   if (mvx[2] == mvx[0] && mvy[2] == mvy[0]) pred[2] = pred[0];
   else if (mvx[2] == mvx[1] && mvy[2] == mvy[1]) pred[2] = pred[1];
   else {
     od_mc_predict1fmv8(state, state->mc_buf[2], src, systride,
-     mvx[2], mvy[2], log_xblk_sz, log_yblk_sz);
+     mvx[2], mvy[2], log_xblk_sz, log_yblk_sz, subsampled_plane);
     pred[2] = state->mc_buf[2];
   }
   if (mvx[3] == mvx[0] && mvy[3] == mvy[0]) pred[3] = pred[0];
@@ -2438,7 +2443,7 @@ void od_mc_predict8(od_state *state, unsigned char *dst, int dystride,
   else if (mvx[3] == mvx[2] && mvy[3] == mvy[2]) pred[3] = pred[2];
   else {
     od_mc_predict1fmv8(state, state->mc_buf[3], src, systride,
-     mvx[3], mvy[3], log_xblk_sz, log_yblk_sz);
+     mvx[3], mvy[3], log_xblk_sz, log_yblk_sz, subsampled_plane);
     pred[3] = state->mc_buf[3];
   }
   od_mc_blend8(state, dst, dystride, pred,

@@ -840,7 +840,8 @@ void od_state_pred_block_from_setup(od_state *state,
   od_mc_predict8(state, buf, ystride, iplane->data + y*iplane->ystride + x,
    iplane->ystride, mvx, mvy, oc, s,
    log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane->xdec,
-   log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane->ydec);
+   log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane->ydec,
+   (iplane->xdec != 0) || (iplane->ydec != 0));
 }
 
 void od_state_pred_block(od_state *state, unsigned char *buf, int ystride,
