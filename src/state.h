@@ -255,6 +255,11 @@ void od_state_fill_vis(od_state *_state);
 void od_mc_predict1fmv8_c(unsigned char *_dst, const unsigned char *_src,
  int _systride, int32_t _mvx, int32_t _mvy,
  int _log_xblk_sz, int _log_yblk_sz);
+#if !defined(OD_X86ASM)
+void thor_mc_predict1fmv8_sse2(unsigned char *dst,const unsigned char *src,
+ int systride, int32_t mvx, int32_t mvy,
+ int log_xblk_sz, int log_yblk_sz);
+#endif
 void od_mc_blend_full8_c(unsigned char *_dst, int _dystride,
  const unsigned char *_src[4], int _log_xblk_sz, int _log_yblk_sz);
 void od_mc_blend_full_split8_c(unsigned char *_dst, int _dystride,

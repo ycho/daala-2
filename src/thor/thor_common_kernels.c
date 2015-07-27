@@ -408,7 +408,6 @@ void get_inter_prediction_chroma_simd(int width, int height, int xoff, int yoff,
   const v128 c3 = v128_dup_16(coeffs[yoff][3]);
   const v128 round = v128_dup_32(2048);
   const v64 filter = v64_load_aligned(coeffs[xoff]);
-  int i;
 
   if (width == 4) {
     v128 in0 = v128_unpack_u8_s16(v64_load_unaligned(ip - 1*istride - 1));
@@ -433,6 +432,7 @@ void get_inter_prediction_chroma_simd(int width, int height, int xoff, int yoff,
     }
   } else {
     int j;
+    int i;
 
     for (j = 0; j < width; j += 8) {
       v128 load0 = v128_load_unaligned(ip - 1*istride + j - 1);

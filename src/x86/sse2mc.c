@@ -153,6 +153,18 @@ void thor_mc_predict1fmv8_sse2(unsigned char *dst,const unsigned char *src,
    width, mvx, mvy);
 }
 
+void thor_mc_predict1fmv8_chroma_sse2(unsigned char *dst,const unsigned char *src,
+ int systride, int32_t mvx, int32_t mvy,
+ int log_xblk_sz, int log_yblk_sz)
+{
+  int width;
+  int height;
+  width = 1 << log_xblk_sz;
+  height = 1 << log_yblk_sz;
+  thor_get_inter_prediction_chroma(dst, src, width, height, systride,
+   width, mvx, mvy);
+}
+
 void od_mc_predict1fmv8_sse2(unsigned char *dst,const unsigned char *src,
  int systride, int32_t mvx, int32_t mvy,
  int log_xblk_sz, int log_yblk_sz) {

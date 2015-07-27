@@ -199,10 +199,14 @@ void od_mc_predict1fmv8_c(unsigned char *dst, const unsigned char *src,
 static void od_mc_predict1fmv8(od_state *state, unsigned char *dst,
  const unsigned char *src, int systride, int32_t mvx, int32_t mvy,
  int log_xblk_sz, int log_yblk_sz, int subsampled_plane) {
+#if defined(OD_THOR_SUBPEL_SIMD) && defined(OD_X86ASM)
   if (subsampled_plane)
-    (*state->opt_vtbl.mc_predict1fmv8)(dst, src, systride, mvx, mvy,
-     log_xblk_sz, log_yblk_sz);
+     /*(*state->opt_vtbl.mc_predict1fmv8)(dst, src, systride, mvx, mvy,
+     log_xblk_sz, log_yblk_sz);*/
+    thor_mc_predict1fmv8_chroma_sse2(dst, src, systride, mvx, mvy,
+        log_xblk_sz, log_yblk_sz);
   else
+#endif
     (*state->opt_vtbl.mc_predict1fmv8)(dst, src, systride, mvx, mvy,
      log_xblk_sz, log_yblk_sz);
 }

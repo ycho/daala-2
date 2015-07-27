@@ -46,7 +46,11 @@ void od_state_opt_vtbl_init_x86(od_state *_state){
 #endif
 
 #if defined(OD_SSE2_INTRINSICS)
+#if defined(OD_THOR_SUBPEL_SIMD)
+    _state->opt_vtbl.mc_predict1fmv8 = thor_mc_predict1fmv8_sse2;
+#else
     _state->opt_vtbl.mc_predict1fmv8 = od_mc_predict1fmv8_sse2;
+#endif
     _state->opt_vtbl.fdct_2d[0] = od_bin_fdct4x4_sse2;
     _state->opt_vtbl.idct_2d[0] = od_bin_idct4x4_sse2;
     _state->opt_vtbl.fdct_2d[1] = od_bin_fdct8x8_sse2;
