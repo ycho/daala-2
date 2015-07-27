@@ -43,6 +43,7 @@ noinst_HEADERS = \
 	src/thor_common_kernels.h \
 	src/thor_common_block.h \
 	src/thor_simd.h \
+	src/thor_types.h \
 	src/thor_simd/v128_intrinsics_arm.h \
 	src/thor_simd/v128_intrinsics_c.h \
 	src/thor_simd/v128_intrinsics_x86.h \
