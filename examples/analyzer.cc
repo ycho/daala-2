@@ -55,7 +55,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 class DaalaDecoder {
 private:
   FILE *input;
-  const char *path;
+  wxString path;
 
   ogg_page page;
   ogg_sync_state oy;
@@ -76,9 +76,10 @@ public:
   DaalaDecoder();
   ~DaalaDecoder();
 
-  bool open(const char *path);
+  bool open(const wxString &path);
+  void close();
   bool step();
-  void reset();
+  void restart();
 
   int getWidth() const;
   int getHeight() const;
@@ -160,25 +161,37 @@ DaalaDecoder::DaalaDecoder() : input(NULL), dsi(NULL), dctx(NULL) {
 }
 
 DaalaDecoder::~DaalaDecoder() {
-  daala_info_clear(&di);
-  daala_comment_clear(&dc);
-  ogg_sync_clear(&oy);
-  daala_setup_free(dsi);
-  daala_decode_free(dctx);
+  close();
 }
 
-bool DaalaDecoder::open(const char *path) {
-  if (path == NULL) {
-    return false;
-  }
+bool DaalaDecoder::open(const wxString &path) {
   ogg_sync_init(&oy);
-  input = fopen(path,"rb");
+  input = fopen(path.mb_str(), "rb");
   if (input == NULL) {
     return false;
   }
   this->path = path;
   frame = 0;
   return readHeaders();
+}
+
+void DaalaDecoder::close() {
+  if (input) {
+    fclose(input);
+    input = NULL;
+  }
+  if (dsi) {
+    daala_setup_free(dsi);
+    dsi = NULL;
+  }
+  if (dctx) {
+    daala_decode_free(dctx);
+    dctx = NULL;
+  }
+  ogg_sync_clear(&oy);
+  ogg_stream_clear(&os);
+  daala_info_clear(&di);
+  daala_comment_clear(&dc);
 }
 
 bool DaalaDecoder::step() {
@@ -194,8 +207,11 @@ bool DaalaDecoder::step() {
   return false;
 }
 
-// TODO: Move cleanup code from destructor to here
-void DaalaDecoder::reset() {
+void DaalaDecoder::restart() {
+  close();
+  daala_info_init(&di);
+  daala_comment_init(&dc);
+  open(path);
 }
 
 int DaalaDecoder::getWidth() const {
@@ -251,16 +267,18 @@ private:
   unsigned char *pixels;
 
   unsigned char *bsize;
+  unsigned int bsize_len;
   int bstride;
   bool show_blocks;
 
   unsigned int *flags;
+  unsigned int flags_len;
   int fstride;
   bool show_skip;
   bool show_noref;
   bool show_padding;
   int plane_mask;
-  wxString path;
+  const wxString path;
 
   // The decode size is the picture size or frame size.
   int getDecodeWidth() const;
@@ -274,13 +292,14 @@ private:
 
   int getBand(int x, int y) const;
 public:
-  TestPanel(wxWindow *parent, wxString &path);
+  TestPanel(wxWindow *parent, const wxString &path);
   ~TestPanel();
 
-  bool open(const char *path);
+  bool open(const wxString &path);
   void close();
   void render();
   bool nextFrame();
+  void restart();
 
   int getZoom() const;
   bool setZoom(int zoom);
@@ -329,9 +348,10 @@ public:
   void onUChange(wxCommandEvent &event);
   void onVChange(wxCommandEvent &event);
   void onNextFrame(wxCommandEvent &event);
+  void onRestart(wxCommandEvent &event);
   void onAbout(wxCommandEvent &event);
 
-  bool open(wxString path);
+  bool open(const wxString &path);
 };
 
 enum {
@@ -342,7 +362,8 @@ enum {
   wxID_SHOW_Y,
   wxID_SHOW_U,
   wxID_SHOW_V,
-  wxID_NEXT_FRAME
+  wxID_NEXT_FRAME,
+  wxID_RESTART
 };
 
 BEGIN_EVENT_TABLE(TestFrame, wxFrame)
@@ -359,20 +380,21 @@ BEGIN_EVENT_TABLE(TestFrame, wxFrame)
   EVT_MENU(wxID_SHOW_U, TestFrame::onUChange)
   EVT_MENU(wxID_SHOW_V, TestFrame::onVChange)
   EVT_MENU(wxID_NEXT_FRAME, TestFrame::onNextFrame)
+  EVT_MENU(wxID_RESTART, TestFrame::onRestart)
   EVT_MENU(wxID_ABOUT, TestFrame::onAbout)
 END_EVENT_TABLE()
 
-TestPanel::TestPanel(wxWindow *parent, wxString &path) : wxPanel(parent),
- pixels(NULL), zoom(0), bsize(NULL), show_blocks(false), flags(NULL),
- show_skip(false), show_noref(false), show_padding(false),
- plane_mask(OD_ALL_MASK), path(path) {
+TestPanel::TestPanel(wxWindow *parent, const wxString &path) : wxPanel(parent),
+ pixels(NULL), zoom(0), bsize(NULL), bsize_len(0), show_blocks(false),
+ flags(NULL), flags_len(0), show_skip(false), show_noref(false),
+ show_padding(false), plane_mask(OD_ALL_MASK), path(path) {
 }
 
 TestPanel::~TestPanel() {
   close();
 }
 
-bool TestPanel::open(const char *path) {
+bool TestPanel::open(const wxString &path) {
   if (!dd.open(path)) {
     return false;
   }
@@ -381,24 +403,28 @@ bool TestPanel::open(const char *path) {
   }
   int nhsb = dd.getFrameWidth() >> OD_LOG_BSIZE0 + OD_NBSIZES - 1;
   int nvsb = dd.getFrameHeight() >> OD_LOG_BSIZE0 + OD_NBSIZES - 1;
-  bsize = (unsigned char *)malloc(sizeof(*bsize)*nhsb*4*nvsb*4);
+  bsize_len = sizeof(*bsize)*nhsb*4*nvsb*4;
+  bsize = (unsigned char *)malloc(bsize_len);
   if (bsize == NULL) {
+    bsize_len = 0;
     close();
     return false;
   }
   bstride = nhsb*4;
-  if (!dd.setBlockSizeBuffer(bsize, sizeof(*bsize)*nhsb*4*nvsb*4)) {
+  if (!dd.setBlockSizeBuffer(bsize, bsize_len)) {
     close();
     return false;
   }
-  flags = (unsigned int *)malloc(sizeof(*flags)*nhsb*8*nvsb*8);
+  flags_len = sizeof(*flags)*nhsb*8*nvsb*8;
+  flags = (unsigned int *)malloc(flags_len);
   if (flags == NULL) {
+    flags_len = 0;
     fprintf(stderr,"Could not allocate memory\n");
     close();
     return false;
   }
   fstride = nhsb*8;
-  if (!dd.setBandFlagsBuffer(flags, sizeof(unsigned int)*nhsb*8*nvsb*8)) {
+  if (!dd.setBandFlagsBuffer(flags, flags_len)) {
     fprintf(stderr,"Could not set flags buffer\n");
     close();
     return false;
@@ -412,7 +438,7 @@ bool TestPanel::open(const char *path) {
 }
 
 void TestPanel::close() {
-  dd.reset();
+  dd.close();
   free(pixels);
   pixels = NULL;
   free(bsize);
@@ -640,10 +666,23 @@ bool TestPanel::nextFrame() {
   return false;
 }
 
+void TestPanel::restart() {
+  dd.restart();
+  dd.setBlockSizeBuffer(bsize, bsize_len);
+  dd.setBandFlagsBuffer(flags, flags_len);
+  nextFrame();
+}
+
 void TestPanel::onKeyDown(wxKeyEvent &event) {
   switch (event.GetKeyCode()) {
     case '.' : {
       nextFrame();
+      Refresh(false);
+      break;
+    }
+    /* Catches 'r' and 'R' */
+    case 'R' : {
+      restart();
       Refresh(false);
       break;
     }
@@ -674,7 +713,7 @@ void TestPanel::onMouseMotion(wxMouseEvent& event) {
     parent->SetStatusText(wxString::Format(wxT("")), 1);
   }
   parent->SetStatusText(wxString::Format(wxT("X:%d,Y:%d"),
-   mouse_x, mouse_y), 2);
+   row, col), 2);
 }
 
 void TestPanel::onMouseLeaveWindow(wxMouseEvent& event) {
@@ -727,7 +766,10 @@ TestFrame::TestFrame() : wxFrame(NULL, wxID_ANY, _T("Daala Stream Analyzer"),
   mb->Append(viewMenu, _T("&View"));
 
   playbackMenu = new wxMenu();
-  playbackMenu->Append(wxID_NEXT_FRAME, _T("Next frame\t."), _("Go to next frame"));
+  playbackMenu->Append(wxID_NEXT_FRAME, _T("Next frame\t."),
+   _("Go to next frame"));
+  playbackMenu->Append(wxID_RESTART, _T("&Restart\tr"),
+   _("Set video to frame 0"));
   mb->Append(playbackMenu, _T("&Playback"));
 
   wxMenu *helpMenu=new wxMenu();
@@ -820,15 +862,18 @@ void TestFrame::onNextFrame(wxCommandEvent &WXUNUSED(event)) {
   panel->Refresh(false);
 }
 
+void TestFrame::onRestart(wxCommandEvent &WXUNUSED(event)) {
+  panel->restart();
+  panel->Refresh(false);
+}
+
 void TestFrame::onAbout(wxCommandEvent& WXUNUSED(event)) {
   wxMessageBox(_T("This program is a bitstream analyzer for Daala."), _T("About"), wxOK | wxICON_INFORMATION, this);
 }
 
-bool TestFrame::open(wxString path) {
-  wxCharBuffer buffer = path.ToUTF8();
-  const char *filename = buffer.data();
+bool TestFrame::open(const wxString &path) {
   panel = new TestPanel(this, path);
-  if (panel->open(filename)) {
+  if (panel->open(path)) {
     Fit();
     SetStatusText(_T("loaded file: ") + path);
     fileMenu->Enable(wxID_OPEN, false);

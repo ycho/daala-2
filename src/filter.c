@@ -26,6 +26,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 # include "config.h"
 #endif
 
+#include <stdlib.h>
 #include "filter.h"
 #include "block_size.h"
 
@@ -1438,6 +1439,49 @@ void od_apply_postfilter_frame_sbs(od_coeff *c0, int stride, int nhsb,
       for (k = 0; k < 4 << f; k++) c[stride*k + j] = t[k];
     }
     c += OD_BSIZE_MAX*stride >> ydec;
+  }
+}
+
+/*Smooths a block using the constrained lowpass filter from Thor
+  (https://tools.ietf.org/html/draft-fuldseth-netvc-thor-00#section-8.2).*/
+void od_clpf(od_coeff *y, int ystride, od_coeff *x, int xstride, int ln,
+ int sbx, int sby, int nhsb, int nvsb) {
+  int i;
+  int j;
+  int n;
+  int delta;
+  int sum;
+  int sign;
+  od_coeff aa;
+  od_coeff bb;
+  od_coeff cc;
+  od_coeff dd;
+  od_coeff xx;
+  n = 1 << ln;
+  for (i = 0; i < n; i++) {
+    for (j = 0; j < n; j++) {
+      xx = x[i*xstride + j];
+      if (sby > 0 || i > 0) aa = x[(i - 1)*xstride + j];
+      else aa = xx;
+      if (sbx > 0 || j > 0) bb = x[i*xstride + (j - 1)];
+      else bb = xx;
+      if (sbx < nhsb - 1 || j < n - 1) cc = x[i*xstride + (j + 1)];
+      else cc = xx;
+      if (sby < nvsb - 1 || i < n - 1) dd = x[(i + 1)*xstride + j];
+      else dd = xx;
+      sum = aa + bb + cc + dd - 4*xx;
+      sign = sum < 0 ? -1 : 1;
+      if (abs(sum) > (16 << OD_COEFF_SHIFT)) {
+        /*Turn off the filter at a threshold of 16 pixels. This gives an
+          improvement over Thor's, but needs more tuning probably. Values of 8,
+          16, 32, and 64 were tried, with this being the best.*/
+        delta = 0;
+      }
+      else {
+        delta = sign * OD_MINI(1 << OD_COEFF_SHIFT, (abs(sum) + 2) >> 2);
+      }
+      y[i*ystride + j] = xx + delta;
+    }
   }
 }
 

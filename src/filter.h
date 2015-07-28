@@ -70,14 +70,15 @@ void od_apply_postfilter_frame(od_coeff *c, int w, int nhsb, int nvsb,
  const unsigned char *bsize, int bstride, int dec);
 
 /* The length in pixel of the lapping of a block is
-   4 << OD_FILT_SIZE(ln, xdec). Right now, we use 8-point lapping for
-   all but 4x4 splits, with the 4x4 splits using 4-point lapping. For
-   subsampled chroma, 4-point lapping is used at all levels.
+   4 << OD_FILT_SIZE(ln, xdec). Right now, we use 4-point lapping for
+   all block sizes and for all planes.
    If this macro is changed, the values in od_basis_mag have to be
    regenerated.*/
-#define OD_FILT_SIZE(ln, xdec) (OD_MAXI(0, ((ln) > 0) - (xdec)))
+#define OD_FILT_SIZE(ln, xdec) (0)
 
 extern const int OD_FILT_SIZE[OD_NBSIZES];
+void od_clpf(od_coeff *y, int ystride, od_coeff *x, int xstride, int ln,
+ int sbx, int sby, int nhsb, int nvsb);
 void od_bilinear_smooth(od_coeff *x, int ln, int stride, int q, int pli);
 void od_prefilter_split(od_coeff *c0, int stride, int bs, int f);
 void od_postfilter_split(od_coeff *c0, int stride, int bs, int f);
