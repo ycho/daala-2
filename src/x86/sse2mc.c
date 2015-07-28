@@ -141,6 +141,36 @@ void od_mc_predict1fmv8_check(unsigned char *_dst,const unsigned char *_src,
 }
 #endif
 
+void thor_mc_predict1fmv8_sse2(unsigned char *dst,const unsigned char *src,
+ int systride, int32_t mvx, int32_t mvy,
+ int log_xblk_sz, int log_yblk_sz)
+{
+  int width;
+  int height;
+  width = 1 << log_xblk_sz;
+  height = 1 << log_yblk_sz;
+  mvx >>= 1;
+  mvy >>= 1;
+  thor_get_inter_prediction_luma(dst, src, width, height, systride,
+   width, mvx, mvy);
+}
+
+void thor_mc_predict1fmv8_chroma_sse2(unsigned char *dst,const unsigned char *src,
+ int systride, int32_t mvx, int32_t mvy,
+ int log_xblk_sz, int log_yblk_sz)
+{
+  int width;
+  int height;
+  width = 1 << log_xblk_sz;
+  height = 1 << log_yblk_sz;
+  /*NOTE: Don't shift down the chroma MV, sine od_state_pred_block_from_setup()
+     already did that before calling od_mc_predict8().
+      mvx >>= 1;
+      mvy >>= 1;*/
+  thor_get_inter_prediction_chroma(dst, src, width, height, systride,
+   width, mvx, mvy);
+}
+
 /*Fills 3 vectors with pairs of alternating 16 bit values for the 1D filter
    chosen for the fractional position of x or y mv.*/
 OD_SIMD_INLINE void od_setup_alternating_filter_variables(
@@ -290,35 +320,6 @@ typedef void (*od_mc_predict1fmv8_horizontal_fixed_func)(int16_t *buff_p,
  const unsigned char *src_p, int systride, int mvxf, int mvyf);
 
 #if defined(OD_SSE2_INTRINSICS)
-void thor_mc_predict1fmv8_sse2(unsigned char *dst,const unsigned char *src,
- int systride, int32_t mvx, int32_t mvy,
- int log_xblk_sz, int log_yblk_sz)
-{
-  int width;
-  int height;
-  width = 1 << log_xblk_sz;
-  height = 1 << log_yblk_sz;
-  mvx >>= 1;
-  mvy >>= 1;
-  thor_get_inter_prediction_luma(dst, src, width, height, systride,
-   width, mvx, mvy);
-}
-
-void thor_mc_predict1fmv8_chroma_sse2(unsigned char *dst,const unsigned char *src,
- int systride, int32_t mvx, int32_t mvy,
- int log_xblk_sz, int log_yblk_sz)
-{
-  int width;
-  int height;
-  width = 1 << log_xblk_sz;
-  height = 1 << log_yblk_sz;
-  /*NOTE: Don't shift down the chroma MV, sine od_state_pred_block_from_setup()
-     already did that before calling od_mc_predict8().
-      mvx >>= 1;
-      mvy >>= 1;*/
-  thor_get_inter_prediction_chroma(dst, src, width, height, systride,
-   width, mvx, mvy);
-}
 
 void od_mc_predict1fmv8_sse2(unsigned char *dst,const unsigned char *src,
  int systride, int32_t mvx, int32_t mvy,
