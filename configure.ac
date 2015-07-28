@@ -124,7 +124,7 @@ AM_CONDITIONAL([ENABLE_ANALYZER], [test "$enable_analyzer" = "yes"])
 dnl Check for tools
 AC_ARG_ENABLE([tools],
   AC_HELP_STRING([--disable-tools], [Disable the tools]),,
-  [enable_tools=no])
+  [enable_tools=yes])
 
 if test "$enable_tools" = "yes" ; then
    AC_CHECK_LIB([jpeg],[jpeg_start_compress],[JPEG_LIBS="-ljpeg"],[AC_MSG_ERROR([libjpeg needed for building tools])])
