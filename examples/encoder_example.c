@@ -498,6 +498,9 @@ int main(int argc, char **argv) {
   use_activity_masking = 1;
   qm = 1;
   mv_res_min = 0;
+#if OD_THOR_SUBPEL_SIMD
+  mv_res_min = 1;
+#endif
   mv_level_min = 0;
   mv_level_max = 6;
   while ((c = getopt_long(argc, argv, OPTSTRING, OPTIONS, &loi)) != EOF) {
@@ -594,6 +597,10 @@ int main(int argc, char **argv) {
             fprintf(stderr, "Illegal value for --mv-res-min\n");
             exit(1);
           }
+#if OD_THOR_SUBPEL_SIMD
+          if (mv_res_min < 1)
+            mv_res_min = 1;
+#endif
         }
         else if (strcmp(OPTIONS[loi].name, "qm") == 0) {
           qm = atoi(optarg);

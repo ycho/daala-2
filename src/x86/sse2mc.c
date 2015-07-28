@@ -149,6 +149,8 @@ void thor_mc_predict1fmv8_sse2(unsigned char *dst,const unsigned char *src,
   int height;
   width = 1 << log_xblk_sz;
   height = 1 << log_yblk_sz;
+  mvx >>= 1;
+  mvy >>= 1;
   thor_get_inter_prediction_luma(dst, src, width, height, systride,
    width, mvx, mvy);
 }
@@ -161,6 +163,10 @@ void thor_mc_predict1fmv8_chroma_sse2(unsigned char *dst,const unsigned char *sr
   int height;
   width = 1 << log_xblk_sz;
   height = 1 << log_yblk_sz;
+  /*NOTE: Don't shift down the chroma MV, sine od_state_pred_block_from_setup()
+     already did that before calling od_mc_predict8().
+      mvx >>= 1;
+      mvy >>= 1;*/
   thor_get_inter_prediction_chroma(dst, src, width, height, systride,
    width, mvx, mvy);
 }
