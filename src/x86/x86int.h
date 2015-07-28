@@ -40,6 +40,9 @@ void od_mc_predict1fmv8_sse2(unsigned char *_dst,const unsigned char *_src,
 void thor_mc_predict1fmv8_sse2(unsigned char *_dst,const unsigned char *_src,
  int _systride,int32_t _mvx,int32_t _mvy,
  int _log_xblk_sz,int _log_yblk_sz);
+void thor_mc_predict1fmv8_chroma_sse2(unsigned char *_dst,const unsigned char *_src,
+ int _systride,int32_t _mvx,int32_t _mvy,
+ int _log_xblk_sz,int _log_yblk_sz);
 void od_mc_blend_full8_sse2(unsigned char *_dst,int _dystride,
  const unsigned char *_src[4],int _log_xblk_sz,int _log_yblk_sz);
 void od_mc_blend_full_split8_sse2(unsigned char *_dst,int _dystride,

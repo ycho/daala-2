@@ -32,6 +32,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 #include "x86int.h"
 #include "cpu.h"
 #include "../mc.h"
+#include "../thor/thor_inter_pred.h"
 
 #if defined(OD_X86ASM)
 #include <xmmintrin.h>

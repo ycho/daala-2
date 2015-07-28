@@ -42,6 +42,7 @@ noinst_HEADERS = \
 	src/thor/thor_global.h \
 	src/thor/thor_common_kernels.h \
 	src/thor/thor_common_block.h \
+	src/thor/thor_inter_pred.h \
 	src/thor/thor_simd.h \
 	src/thor/thor_types.h \
 	src/thor/thor_simd/v128_intrinsics_arm.h \
@@ -339,7 +340,11 @@ tools_upsample_SOURCES = \
 if ENABLE_X86ASM
 tools_upsample_SOURCES += \
 	src/x86/sse2mc.c \
-	src/x86/x86state.c
+	src/x86/x86state.c \
+	src/thor/thor_common_kernels.c \
+	src/thor/thor_inter_pred.c \
+	src/thor/thor_simd.c
+
 endif
 tools_upsample_CFLAGS = $(THEORA_CFLAGS) $(OGG_CFLAGS) $(PNG_CFLAGS)
 tools_upsample_LDADD = $(THEORA_LIBS) $(OGG_LIBS) $(PNG_LIBS) $(LIBM)
