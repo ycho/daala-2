@@ -421,6 +421,7 @@ struct od_mb_enc_ctx {
   int qm;
   int use_haar_wavelet;
   int is_golden_frame;
+  int frame_type;
 };
 typedef struct od_mb_enc_ctx od_mb_enc_ctx;
 
@@ -2036,6 +2037,11 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
   if (enc->state.ref_imgi[OD_FRAME_GOLD] < 0) {
     mbctx.is_golden_frame = 1;
   }
+  /*TODO: If current frame is P, we have input frames for B stored in buffer,
+    then we will return around here.*/
+
+
+
   /*Update the buffer state.*/
   if (enc->state.ref_imgi[OD_FRAME_SELF] >= 0) {
     enc->state.ref_imgi[OD_FRAME_PREV] =
@@ -2048,6 +2054,8 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
   enc->state.ref_imgi[OD_FRAME_SELF] = refi;
   /*We must be a keyframe if we don't have a reference.*/
   mbctx.is_keyframe |= !(enc->state.ref_imgi[OD_FRAME_PREV] >= 0);
+  if (mbctx.is_keyframe)
+    mbctx.frame_type = OD_I_FRAME;
   /* FIXME: This should be dynamic */
   mbctx.use_activity_masking = enc->use_activity_masking;
   mbctx.qm = enc->qm;

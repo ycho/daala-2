@@ -87,6 +87,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 # define OD_DEBLOCKING (0)
 # define OD_DISABLE_CFL (0)
 
+/*Number of B fames. 0 means no B frames.*/
+# define OD_NUM_OF_B_FRAMES (2)
 # define OD_ROBUST_STREAM (0)
 
 # define OD_USE_HAAR_WAVELET (0)

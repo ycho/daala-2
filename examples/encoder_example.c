@@ -349,6 +349,9 @@ int fetch_and_process_video(av_input *avin, ogg_page *page,
     while (daala_encode_packet_out(dd, last, &op)) {
       ogg_stream_packetin(vo, &op);
     }
+    /*Even if not B frame, we call this function,
+       since inside it we need to store the input frames for B
+       if current frame is P.*/
     /*Submit the current frame for encoding.*/
     if (!last) daala_encode_img_in(dd, &avin->video_img, 0);
   }

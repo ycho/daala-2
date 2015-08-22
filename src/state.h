@@ -70,6 +70,11 @@ extern const int OD_HAAR_QM[2][OD_LOG_BSIZE_MAX];
 /*The input I/O frame.*/
 # define OD_FRAME_INPUT (1)
 
+/*Frame types.*/
+# define OD_I_FRAME (0)
+# define OD_P_FRAME (1)
+# define OD_B_FRAME (2)
+
 /*Constants for the packet state machine common between encoder and decoder.*/
 
 /*Next packet to emit/read: Codec info header.*/
