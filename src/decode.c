@@ -231,7 +231,7 @@ static void od_decode_compute_pred(daala_dec_ctx *dec, od_mb_dec_ctx *ctx,
   int x;
   OD_ASSERT(bs >= 0 && bs < OD_NBSIZES);
   n = 1 << bs + OD_LOG_BSIZE0;
-  xdec = dec->state.io_imgs[dec->state.curr_in_frame_id].planes[pli].xdec;
+  xdec = dec->state.io_imgs[OD_FRAME_REC].planes[pli].xdec;
   w = dec->state.frame_width >> xdec;
   bo = (by << OD_LOG_BSIZE0)*w + (bx << OD_LOG_BSIZE0);
   /*We never use tf on the chroma planes, but if we do it will blow up, which
@@ -456,7 +456,7 @@ static void od_block_decode(daala_dec_ctx *dec, od_mb_dec_ctx *ctx, int bs,
   qm = ctx->qm == OD_HVS_QM ? OD_QM8_Q4_HVS : OD_QM8_Q4_FLAT;
   bx <<= bs;
   by <<= bs;
-  xdec = dec->state.io_imgs[dec->state.curr_in_frame_id].planes[pli].xdec;
+  xdec = dec->state.io_imgs[OD_FRAME_REC].planes[pli].xdec;
   frame_width = dec->state.frame_width;
   w = frame_width >> xdec;
   bo = (by << 2)*w + (bx << 2);
@@ -898,8 +898,8 @@ static void od_decode_coefficients(od_dec_ctx *dec, od_mb_dec_ctx *mbctx) {
         mbctx->mc = state->mctmp[pli];
         mbctx->md = state->mdtmp[pli];
         mbctx->l = state->lbuf[pli];
-        xdec = state->io_imgs[state->curr_in_frame_id].planes[pli].xdec;
-        ydec = state->io_imgs[state->curr_in_frame_id].planes[pli].ydec;
+        xdec = state->io_imgs[OD_FRAME_REC].planes[pli].xdec;
+        ydec = state->io_imgs[OD_FRAME_REC].planes[pli].ydec;
         if (mbctx->is_keyframe) {
           od_decode_haar_dc_sb(dec, mbctx, pli, sbx, sby, xdec, ydec,
            sby > 0 && sbx < nhsb - 1, &hgrad, &vgrad);
@@ -910,8 +910,8 @@ static void od_decode_coefficients(od_dec_ctx *dec, od_mb_dec_ctx *mbctx) {
     }
   }
   for (pli = 0; pli < nplanes; pli++) {
-    xdec = state->io_imgs[state->curr_in_frame_id].planes[pli].xdec;
-    ydec = state->io_imgs[state->curr_in_frame_id].planes[pli].ydec;
+    xdec = state->io_imgs[OD_FRAME_REC].planes[pli].xdec;
+    ydec = state->io_imgs[OD_FRAME_REC].planes[pli].ydec;
     w = frame_width >> xdec;
     h = frame_height >> ydec;
     if (!mbctx->use_haar_wavelet) {
@@ -949,8 +949,8 @@ static void od_decode_coefficients(od_dec_ctx *dec, od_mb_dec_ctx *mbctx) {
             od_coeff *output;
             int ln;
             int n;
-            xdec = state->io_imgs[state->curr_in_frame_id].planes[pli].xdec;
-            ydec = state->io_imgs[state->curr_in_frame_id].planes[pli].ydec;
+            xdec = state->io_imgs[OD_FRAME_REC].planes[pli].xdec;
+            ydec = state->io_imgs[OD_FRAME_REC].planes[pli].ydec;
             w = frame_width >> xdec;
             h = frame_height >> ydec;
             ln = OD_LOG_BSIZE_MAX - xdec;
@@ -974,8 +974,8 @@ static void od_decode_coefficients(od_dec_ctx *dec, od_mb_dec_ctx *mbctx) {
     }
   }
   for (pli = 0; pli < nplanes; pli++) {
-    xdec = state->io_imgs[state->curr_in_frame_id].planes[pli].xdec;
-    ydec = state->io_imgs[state->curr_in_frame_id].planes[pli].ydec;
+    xdec = state->io_imgs[OD_FRAME_REC].planes[pli].xdec;
+    ydec = state->io_imgs[OD_FRAME_REC].planes[pli].ydec;
     w = frame_width >> xdec;
     h = frame_height >> ydec;
     if (dec->quantizer[0] > 0)
@@ -1037,10 +1037,6 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
   mbctx.qm = od_ec_decode_bool_q15(&dec->ec, 16384, "flags");
   mbctx.use_haar_wavelet = od_ec_decode_bool_q15(&dec->ec, 16384, "flags");
   mbctx.is_golden_frame = od_ec_decode_bool_q15(&dec->ec, 16384, "flags");
-
-  /*For decoder, fixed as input frame.*/
-  dec->state.curr_in_frame_id = 1;
-
   if (mbctx.is_keyframe) {
     int nplanes;
     int pli;

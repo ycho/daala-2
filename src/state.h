@@ -68,8 +68,7 @@ extern const int OD_HAAR_QM[2][OD_LOG_BSIZE_MAX];
 /*The reconstructed I/O frame.*/
 # define OD_FRAME_REC   (0)
 /*The input I/O frame.*/
-/*# define OD_FRAME_INPUT (1)*/
-# define OD_FRAME_INPUT(state) (((od_state *)state)->curr_in_frame_id)
+# define OD_FRAME_INPUT (1)
 
 /*Frame types.*/
 # define OD_I_FRAME (0)
@@ -180,7 +179,8 @@ struct od_state{
   od_img              ref_imgs[4];
   /** Pointer to input and output image. */
   od_img              io_imgs[2 + OD_NUM_OF_B_FRAMES];
-  /** Index for current input frame in io_imgs[]. */
+  /** Index for current input frame,
+      if multiple input images are in io_imgs[]. */
   int           curr_in_frame_id;
   unsigned char *ref_line_buf[8];
   unsigned char *ref_img_data;
