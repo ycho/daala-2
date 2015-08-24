@@ -53,6 +53,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 # include "x86/x86int.h"
 #endif
 
+#define OD_DUMP_IMAGES
+
 /* These are the PVQ equivalent of quantization matrices, except that
    the values are per-band. */
 #define OD_MASKING_DISABLED 0
@@ -435,7 +437,7 @@ static void od_encode_compute_pred(daala_enc_ctx *enc, od_mb_enc_ctx *ctx,
   int x;
   OD_ASSERT(bs >= 0 && bs < OD_NBSIZES);
   n = 1 << bs + OD_LOG_BSIZE0;
-  xdec = enc->state.io_imgs[OD_FRAME_INPUT].planes[pli].xdec;
+  xdec = enc->state.io_imgs[enc->state.curr_in_frame_id].planes[pli].xdec;
   w = enc->state.frame_width >> xdec;
   bo = (by << OD_LOG_BSIZE0)*w + (bx << OD_LOG_BSIZE0);
   /*We never use tf on the chroma planes, but if we do it will blow up, which
@@ -797,7 +799,7 @@ static int od_block_encode(daala_enc_ctx *enc, od_mb_enc_ctx *ctx, int bs,
   n = 1 << (bs + 2);
   bx <<= bs;
   by <<= bs;
-  xdec = enc->state.io_imgs[OD_FRAME_INPUT].planes[pli].xdec;
+  xdec = enc->state.io_imgs[enc->state.curr_in_frame_id].planes[pli].xdec;
   frame_width = enc->state.frame_width;
   use_masking = enc->use_activity_masking;
   w = frame_width >> xdec;
@@ -1399,11 +1401,11 @@ static void od_img_copy_pad(od_state *state, od_img *img) {
     ydec = plane.ydec;
     plane_width = ((state->info.pic_width + (1 << xdec) - 1) >> xdec);
     plane_height = ((state->info.pic_height + (1 << ydec) - 1) >> ydec);
-    od_img_plane_copy_pad8(&state->io_imgs[OD_FRAME_INPUT].planes[pli],
+    od_img_plane_copy_pad8(&state->io_imgs[state->curr_in_frame_id].planes[pli],
      state->frame_width >> xdec, state->frame_height >> ydec,
      &plane, plane_width, plane_height);
   }
-  od_img_edge_ext(state->io_imgs + OD_FRAME_INPUT);
+  od_img_edge_ext(state->io_imgs + state->curr_in_frame_id);
 }
 
 #if defined(OD_DUMP_IMAGES)
@@ -1415,7 +1417,7 @@ static void od_img_dump_padded(od_state *state) {
   info = &state->info;
   nplanes = info->nplanes;
   /*Modify the image offsets to include the padding.*/
-  *&img = *(state->io_imgs+OD_FRAME_INPUT);
+  *&img = *(state->io_imgs+state->curr_in_frame_id);
   for (pli = 0; pli < nplanes; pli++) {
     img.planes[pli].data -= (OD_UMV_PADDING>>info->plane_info[pli].xdec)
         +img.planes[pli].ystride*(OD_UMV_PADDING>>info->plane_info[pli].ydec);
@@ -1467,9 +1469,9 @@ static void od_split_superblocks(daala_enc_ctx *enc, int is_keyframe) {
   /* Allocate a blockSizeComp for scratch space and then calculate the block
      sizes eventually store them in bsize. */
   od_log_matrix_uchar(OD_LOG_GENERIC, OD_LOG_INFO, "bimg ",
-   state->io_imgs[OD_FRAME_INPUT].planes[0].data -
-   16*state->io_imgs[OD_FRAME_INPUT].planes[0].ystride - 16,
-   state->io_imgs[OD_FRAME_INPUT].planes[0].ystride, (nvsb + 1)*32);
+   state->io_imgs[state->curr_in_frame_id].planes[0].data -
+   16*state->io_imgs[state->curr_in_frame_id].planes[0].ystride - 16,
+   state->io_imgs[state->curr_in_frame_id].planes[0].ystride, (nvsb + 1)*32);
   for (i = 0; i < nvsb; i++) {
     unsigned char *bimg;
     unsigned char *rimg;
@@ -1477,10 +1479,10 @@ static void od_split_superblocks(daala_enc_ctx *enc, int is_keyframe) {
     int rstride;
     int bstride;
     bstride = state->bstride;
-    istride = state->io_imgs[OD_FRAME_INPUT].planes[0].ystride;
+    istride = state->io_imgs[state->curr_in_frame_id].planes[0].ystride;
     rstride = is_keyframe ? 0 :
      state->io_imgs[OD_FRAME_REC].planes[0].ystride;
-    bimg = state->io_imgs[OD_FRAME_INPUT].planes[0].data
+    bimg = state->io_imgs[state->curr_in_frame_id].planes[0].data
      + i*istride*OD_BSIZE_MAX;
     rimg = state->io_imgs[OD_FRAME_REC].planes[0].data
      + i*rstride*OD_BSIZE_MAX;
@@ -1622,8 +1624,8 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
     od_ec_enc_uint(&enc->ec, enc->coded_quantizer[pli], OD_N_CODED_QUANTIZERS);
   }
   for (pli = 0; pli < nplanes; pli++) {
-    xdec = state->io_imgs[OD_FRAME_INPUT].planes[pli].xdec;
-    ydec = state->io_imgs[OD_FRAME_INPUT].planes[pli].ydec;
+    xdec = state->io_imgs[state->curr_in_frame_id].planes[pli].xdec;
+    ydec = state->io_imgs[state->curr_in_frame_id].planes[pli].ydec;
     w = frame_width >> xdec;
     h = frame_height >> ydec;
     /*Collect the image data needed for this plane.*/
@@ -1633,9 +1635,9 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
       int ystride;
       int coeff_shift;
       coeff_shift = enc->quantizer[pli] == 0 ? 0 : OD_COEFF_SHIFT;
-      data = state->io_imgs[OD_FRAME_INPUT].planes[pli].data;
+      data = state->io_imgs[state->curr_in_frame_id].planes[pli].data;
       mdata = state->io_imgs[OD_FRAME_REC].planes[pli].data;
-      ystride = state->io_imgs[OD_FRAME_INPUT].planes[pli].ystride;
+      ystride = state->io_imgs[state->curr_in_frame_id].planes[pli].ystride;
       for (y = 0; y < h; y++) {
         for (x = 0; x < w; x++) {
           state->ctmp[pli][y*w + x] = (data[ystride*y + x] - 128) <<
@@ -1672,8 +1674,8 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
         mbctx->mc = state->mctmp[pli];
         mbctx->md = state->mdtmp[pli];
         mbctx->l = state->lbuf[pli];
-        xdec = state->io_imgs[OD_FRAME_INPUT].planes[pli].xdec;
-        ydec = state->io_imgs[OD_FRAME_INPUT].planes[pli].ydec;
+        xdec = state->io_imgs[state->curr_in_frame_id].planes[pli].xdec;
+        ydec = state->io_imgs[state->curr_in_frame_id].planes[pli].ydec;
         if (mbctx->is_keyframe) {
           int width;
           width = enc->state.frame_width;
@@ -1716,13 +1718,13 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
       unsigned char *data;
       int ystride;
       int coeff_shift;
-      xdec = state->io_imgs[OD_FRAME_INPUT].planes[pli].xdec;
-      ydec = state->io_imgs[OD_FRAME_INPUT].planes[pli].ydec;
+      xdec = state->io_imgs[state->curr_in_frame_id].planes[pli].xdec;
+      ydec = state->io_imgs[state->curr_in_frame_id].planes[pli].ydec;
       w = frame_width >> xdec;
       h = frame_height >> ydec;
       coeff_shift = enc->quantizer[pli] == 0 ? 0 : OD_COEFF_SHIFT;
       data = state->io_imgs[OD_FRAME_REC].planes[pli].data;
-      ystride = state->io_imgs[OD_FRAME_INPUT].planes[pli].ystride;
+      ystride = state->io_imgs[state->curr_in_frame_id].planes[pli].ystride;
       for (y = 0; y < h; y++) {
         for (x = 0; x < w; x++) {
           data[ystride*y + x] = OD_CLAMP255(((state->ctmp[pli][y*w + x]
@@ -1735,8 +1737,8 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
   }
 #endif
   for (pli = 0; pli < nplanes; pli++) {
-    xdec = state->io_imgs[OD_FRAME_INPUT].planes[pli].xdec;
-    ydec = state->io_imgs[OD_FRAME_INPUT].planes[pli].ydec;
+    xdec = state->io_imgs[state->curr_in_frame_id].planes[pli].xdec;
+    ydec = state->io_imgs[state->curr_in_frame_id].planes[pli].ydec;
     w = frame_width >> xdec;
     h = frame_height >> ydec;
     if (!mbctx->use_haar_wavelet) {
@@ -1768,15 +1770,15 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
           continue;
         }
         pli = 0;
-        xdec = state->io_imgs[OD_FRAME_INPUT].planes[pli].xdec;
+        xdec = state->io_imgs[state->curr_in_frame_id].planes[pli].xdec;
         w = frame_width >> xdec;
-        OD_ASSERT(xdec == state->io_imgs[OD_FRAME_INPUT].planes[pli].ydec);
+        OD_ASSERT(xdec == state->io_imgs[state->curr_in_frame_id].planes[pli].ydec);
         ln = OD_LOG_BSIZE_MAX - xdec;
         n = 1 << ln;
         od_clpf(buf, OD_BSIZE_MAX, &state->ctmp[pli][(sby << ln)*w +
          (sbx << ln)], w, ln, sbx, sby, nhsb, nvsb);
-        ystride = state->io_imgs[OD_FRAME_INPUT].planes[pli].ystride;
-        input = (unsigned char *)&state->io_imgs[OD_FRAME_INPUT].planes[pli].
+        ystride = state->io_imgs[state->curr_in_frame_id].planes[pli].ystride;
+        input = (unsigned char *)&state->io_imgs[state->curr_in_frame_id].planes[pli].
          data[(sby << ln)*ystride + (sbx << ln)];
         output = &state->ctmp[pli][(sby << ln)*w + (sbx << ln)];
         unfiltered_error = 0;
@@ -1817,7 +1819,7 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
             }
           }
           for (pli = 1; pli < nplanes; pli++) {
-            xdec = state->io_imgs[OD_FRAME_INPUT].planes[pli].xdec;
+            xdec = state->io_imgs[state->curr_in_frame_id].planes[pli].xdec;
             w = frame_width >> xdec;
             ln = OD_LOG_BSIZE_MAX - xdec;
             n = 1 << ln;
@@ -1839,8 +1841,8 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
     }
   }
   for (pli = 0; pli < nplanes; pli++) {
-    xdec = state->io_imgs[OD_FRAME_INPUT].planes[pli].xdec;
-    ydec = state->io_imgs[OD_FRAME_INPUT].planes[pli].ydec;
+    xdec = state->io_imgs[state->curr_in_frame_id].planes[pli].xdec;
+    ydec = state->io_imgs[state->curr_in_frame_id].planes[pli].ydec;
     w = frame_width >> xdec;
     h = frame_height >> ydec;
     if (!rdo_only && enc->quantizer[0] > 0) {
@@ -1864,7 +1866,7 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
       int coeff_shift;
       coeff_shift = enc->quantizer[pli] == 0 ? 0 : OD_COEFF_SHIFT;
       data = state->io_imgs[OD_FRAME_REC].planes[pli].data;
-      ystride = state->io_imgs[OD_FRAME_INPUT].planes[pli].ystride;
+      ystride = state->io_imgs[state->curr_in_frame_id].planes[pli].ystride;
       for (y = 0; y < h; y++) {
         for (x = 0; x < w; x++) {
           data[ystride*y + x] = OD_CLAMP255(((state->ctmp[pli][y*w + x]
@@ -1896,10 +1898,10 @@ static void od_dump_frame_metrics(od_state *state) {
     int x;
     int y;
     enc_sqerr = 0;
-    data = state->io_imgs[OD_FRAME_INPUT].planes[pli].data;
-    ystride = state->io_imgs[OD_FRAME_INPUT].planes[pli].ystride;
-    xdec = state->io_imgs[OD_FRAME_INPUT].planes[pli].xdec;
-    ydec = state->io_imgs[OD_FRAME_INPUT].planes[pli].ydec;
+    data = state->io_imgs[state->curr_in_frame_id].planes[pli].data;
+    ystride = state->io_imgs[state->curr_in_frame_id].planes[pli].ystride;
+    xdec = state->io_imgs[state->curr_in_frame_id].planes[pli].xdec;
+    ydec = state->io_imgs[state->curr_in_frame_id].planes[pli].ydec;
     w = frame_width >> xdec;
     h = frame_height >> ydec;
     npixels = w*h;
@@ -2022,6 +2024,8 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
       return OD_EINVAL;
     }
   }
+  /*Fixed as 1st input frame for now, so not using B frames.*/
+  enc->state.curr_in_frame_id = 1;
   od_img_copy_pad(&enc->state, img);
 
 #if defined(OD_DUMP_IMAGES)
@@ -2039,6 +2043,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
   }
   /*If current frame is P, we have 'the input frames for B' stored in buffer,
     then we will return around here w/o doing actual encoding.*/
+
 
 
 
@@ -2124,6 +2129,11 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
   OD_LOG((OD_LOG_ENCODER, OD_LOG_INFO, "is_keyframe=%d", mbctx.is_keyframe));
   /*TODO: Increment frame count.*/
   od_adapt_ctx_reset(&enc->state.adapt, mbctx.is_keyframe);
+#if defined(OD_DUMP_IMAGES)
+  /*Dump input frame.*/
+  od_state_dump_img(&enc->state, enc->state.io_imgs + enc->state.curr_in_frame_id,
+   "input");
+#endif
   if (!mbctx.is_keyframe) {
     od_predict_frame(enc);
     od_encode_mvs(enc);
