@@ -178,7 +178,7 @@ struct od_state{
       them. */
   od_img              ref_imgs[4];
   /** Pointer to input and output image. */
-  od_img              io_imgs[2];
+  od_img              io_imgs[2 + OD_NUM_OF_B_FRAMES];
   unsigned char *ref_line_buf[8];
   unsigned char *ref_img_data;
   /** Increments by 1 for each frame. */
