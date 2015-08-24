@@ -2037,8 +2037,8 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
   if (enc->state.ref_imgi[OD_FRAME_GOLD] < 0) {
     mbctx.is_golden_frame = 1;
   }
-  /*TODO: If current frame is P, we have input frames for B stored in buffer,
-    then we will return around here.*/
+  /*If current frame is P, we have 'the input frames for B' stored in buffer,
+    then we will return around here w/o doing actual encoding.*/
 
 
 
