@@ -102,7 +102,7 @@ int main(int _argc, char **_argv) {
   dinfo.nplanes = 3;
   dinfo.pic_height = h[0];
   dinfo.pic_width = w[0];
-
+  state.codec_mode = 1;
   od_state_init(&state, &dinfo);
 
   fout = strcmp(_argv[optind+1], "-") == 0 ? stdout : fopen(_argv[optind+1],

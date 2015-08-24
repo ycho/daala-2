@@ -165,6 +165,8 @@ struct od_adapt_ctx {
 };
 
 struct od_state{
+  /** Codec mode. 0: encoder, 1: decoder. */
+  int                 codec_mode;
   od_adapt_ctx        adapt;
   daala_info          info;
   OD_ALIGN16(unsigned char mc_buf[5][OD_MVBSIZE_MAX*OD_MVBSIZE_MAX]);

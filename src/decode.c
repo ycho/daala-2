@@ -50,6 +50,7 @@ static int od_dec_init(od_dec_ctx *dec, const daala_info *info,
  const daala_setup_info *setup) {
   int ret;
   (void)setup;
+  dec->state.codec_mode = 1;
   ret = od_state_init(&dec->state, info);
   if (ret < 0) return ret;
   dec->packet_state = OD_PACKET_DATA;

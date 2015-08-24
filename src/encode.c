@@ -171,6 +171,7 @@ static void od_enc_opt_vtbl_init(od_enc_ctx *enc) {
 static int od_enc_init(od_enc_ctx *enc, const daala_info *info) {
   int i;
   int ret;
+  enc->state.codec_mode = 0;
   ret = od_state_init(&enc->state, info);
   if (ret < 0) return ret;
   enc->use_satd = 0;
