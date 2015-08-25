@@ -2002,6 +2002,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
   od_img *ref_img;
   int gop_size;
   int frame_idx_in_gop;
+  int frame_idx_in_subgop; /*IBB..B or PBB..B.*/
   int frame_type;
   if (enc == NULL || img == NULL) return OD_EFAULT;
   if (enc->packet_state == OD_PACKET_DONE) return OD_EINVAL;
@@ -2033,28 +2034,30 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
   /*We have a new field 'mbctx.frame_type' to store the frame type.*/
   /* Check if the frame should be a keyframe. */
   frame_idx_in_gop = enc->state.cur_time % gop_size;
+  frame_idx_in_subgop = frame_idx_in_gop % (OD_NUM_B_FRAMES + 1);
   if (frame_idx_in_gop == 0)
     frame_type = OD_I_FRAME;
   else {
     if (OD_NUM_B_FRAMES == 0)
       frame_type = OD_P_FRAME;
     else {
-      if (frame_idx_in_gop % (OD_NUM_B_FRAMES + 1))
+      /*if (frame_idx_in_gop % (OD_NUM_B_FRAMES + 1))*/
+      if (frame_idx_in_subgop)
         frame_type = OD_B_FRAME;
       else
         frame_type = OD_P_FRAME;
     }
   }
   mbctx.frame_type = frame_type;
-  /*printf("frame %03d (frame idx in GOP %03d) : frame type %d\n",
-     enc->state.cur_time, frame_idx_in_gop, frame_type);*/
+  printf("frame %03d (frame idx in GOP %03d, idx in subGOP %d) : frame type %d\n",
+     (int)enc->state.cur_time, frame_idx_in_gop, frame_idx_in_subgop, frame_type);
 
   /*If current frame is P, we have 'the input frames for B' stored in buffer,
     then we will return around here w/o doing actual encoding.*/
-
-
+  if (enc->state.frames_in_buff == 0)
+  {
   /*Fixed as 1st input frame for now, so not using B frames.*/
-  enc->state.curr_in_frame_id = 1;
+  enc->state.curr_in_frame_id = frame_idx_in_subgop + 1;
   od_img_copy_pad(&enc->state, img);
 
 #if defined(OD_DUMP_IMAGES)
@@ -2063,10 +2066,12 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
   }
 #endif
   /*# of frames left in io_imgs[] to encode.*/
-  enc->state.frames_to_process += 1;
+  enc->state.frames_in_buff += 1;
+  }
 
-  /*if (mbctx.frame_type == OD_B_FRAME)
-    return 0;*/
+  /*if (mbctx.frame_type == OD_B_FRAME) {
+      return 0;
+    }*/
 
   /*for (;frame_type == 3;)*/
   {
@@ -2198,6 +2203,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
   /*od_state_dump_img(&enc->state,
    enc->state.ref_img + enc->state.ref_imigi[OD_FRAME_SELF], "ref");*/
 #endif
+  enc->state.frames_in_buff += 1;
   }
   if (enc->state.info.frame_duration == 0) enc->state.cur_time += duration;
   else enc->state.cur_time += enc->state.info.frame_duration;

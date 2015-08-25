@@ -185,7 +185,7 @@ struct od_state{
       if multiple input images are in io_imgs[]. */
   int           curr_in_frame_id;
   /** # of frames in buffer to encode. */
-  int           frames_to_process;
+  int           frames_in_buff;
   unsigned char *ref_line_buf[8];
   unsigned char *ref_img_data;
   /** Increments by 1 for each frame. */
