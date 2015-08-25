@@ -294,7 +294,7 @@ static int od_state_init_impl(od_state *state, const daala_info *info) {
   state->nvmvbs = state->frame_height >> OD_LOG_MVBSIZE_MIN;
   od_state_opt_vtbl_init(state);
   /*If B frames are used, we need additional frame buffers (for encoder only).*/
-  num_io_frames = state->codec_mode ? 1 : 2 + OD_NUM_OF_B_FRAMES;
+  num_io_frames = state->codec_mode ? 1 : 2 + OD_NUM_B_FRAMES;
   if (OD_UNLIKELY(od_state_ref_imgs_init(state, 4, num_io_frames))) {
     return OD_EFAULT;
   }

@@ -2000,6 +2000,9 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
   int use_masking;
   od_mb_enc_ctx mbctx;
   od_img *ref_img;
+  int gop_size;
+  int frame_idx_in_gop;
+  int frame_type;
   if (enc == NULL || img == NULL) return OD_EFAULT;
   if (enc->packet_state == OD_PACKET_DONE) return OD_EINVAL;
   /*Check the input image dimensions to make sure they're compatible with the
@@ -2025,6 +2028,31 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
       return OD_EINVAL;
     }
   }
+  gop_size = enc->state.info.keyframe_rate;
+  /*Decide a frame type based on the frame counter, enc->state.cur_time.*/
+  /*We have a new field 'mbctx.frame_type' to store the frame type.*/
+  /* Check if the frame should be a keyframe. */
+  frame_idx_in_gop = enc->state.cur_time % gop_size;
+  if (frame_idx_in_gop == 0)
+    frame_type = OD_I_FRAME;
+  else {
+    if (OD_NUM_B_FRAMES == 0)
+      frame_type = OD_P_FRAME;
+    else {
+      if (frame_idx_in_gop % (OD_NUM_B_FRAMES + 1))
+        frame_type = OD_B_FRAME;
+      else
+        frame_type = OD_P_FRAME;
+    }
+  }
+  mbctx.frame_type = frame_type;
+  /*printf("frame %03d (frame idx in GOP %03d) : frame type %d\n",
+     enc->state.cur_time, frame_idx_in_gop, frame_type);*/
+
+  /*If current frame is P, we have 'the input frames for B' stored in buffer,
+    then we will return around here w/o doing actual encoding.*/
+
+
   /*Fixed as 1st input frame for now, so not using B frames.*/
   enc->state.curr_in_frame_id = 1;
   od_img_copy_pad(&enc->state, img);
@@ -2034,6 +2062,14 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
     od_img_dump_padded(&enc->state);
   }
 #endif
+  /*# of frames left in io_imgs[] to encode.*/
+  enc->state.frames_to_process += 1;
+
+  /*if (mbctx.frame_type == OD_B_FRAME)
+    return 0;*/
+
+  /*for (;frame_type == 3;)*/
+  {
   /* Check if the frame should be a keyframe. */
   mbctx.is_keyframe = (enc->state.cur_time %
    (enc->state.info.keyframe_rate) == 0) ? 1 : 0;
@@ -2042,11 +2078,6 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
   if (enc->state.ref_imgi[OD_FRAME_GOLD] < 0) {
     mbctx.is_golden_frame = 1;
   }
-  /*If current frame is P, we have 'the input frames for B' stored in buffer,
-    then we will return around here w/o doing actual encoding.*/
-
-
-
 
   /*Update the buffer state.*/
   if (enc->state.ref_imgi[OD_FRAME_SELF] >= 0) {
@@ -2167,6 +2198,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
   /*od_state_dump_img(&enc->state,
    enc->state.ref_img + enc->state.ref_imigi[OD_FRAME_SELF], "ref");*/
 #endif
+  }
   if (enc->state.info.frame_duration == 0) enc->state.cur_time += duration;
   else enc->state.cur_time += enc->state.info.frame_duration;
   return 0;

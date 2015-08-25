@@ -180,10 +180,12 @@ struct od_state{
       them. */
   od_img              ref_imgs[4];
   /** Pointer to input and output image. */
-  od_img              io_imgs[2 + OD_NUM_OF_B_FRAMES];
+  od_img              io_imgs[2 + OD_NUM_B_FRAMES];
   /** Index for current input frame,
       if multiple input images are in io_imgs[]. */
   int           curr_in_frame_id;
+  /** # of frames in buffer to encode. */
+  int           frames_to_process;
   unsigned char *ref_line_buf[8];
   unsigned char *ref_img_data;
   /** Increments by 1 for each frame. */
