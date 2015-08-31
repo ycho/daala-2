@@ -392,8 +392,11 @@ static int od_state_init_impl(od_state *state, const daala_info *info) {
 #endif
   state->clpf_flags = (unsigned char *)malloc(state->nhsb * state->nvsb);
   state->sb_skip_flags = (unsigned char *)malloc(state->nhsb * state->nvsb);
+  /*Init input buffer related variables.*/
   state->frame_delay = OD_NUM_B_FRAMES + 1;
-  state->in_buff_ptr = OD_FRAME_INPUT;
+  state->in_buff_ptr = 0;
+  state->in_buff_head = 0;
+  state->frames_in_buff = 0;
   return OD_SUCCESS;
 }
 

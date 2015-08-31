@@ -1992,30 +1992,36 @@ static void od_split_superblocks_rdo(daala_enc_ctx *enc,
   od_encode_rollback(enc, &rbuf);
 }
 
-int od_buff_head(od_state *state)
+int od_get_buff_head(od_state *state)
 {
   int head;
-  head = (state->in_buff_ptr + 1) % state->frame_delay + 1;
-
+  head = state->in_buff_head;
+  /*Update the head of in_buff[].*/
+  state->in_buff_head = (head + 1) % state->frame_delay;
+  state->frames_in_buff -= 1;
   return head;
 }
 
-int od_buff_tail(od_state *state)
+int od_get_buff_tail(od_state *state)
 {
-  return (state->in_buff_ptr - 1) % state->frame_delay;
+  int tail;
+  tail = (state->in_buff_ptr - 1) % state->frame_delay;
+  /*Update the head of in_buff[].*/
+  state->in_buff_ptr = (tail - 1) % state->frame_delay;
+  state->frames_in_buff -= 1;
+  return tail;
 }
 
-/*Update all buffer pointers related to state->io_imgs[].*/
-void od_buff_add(od_state *state)
+/*Update all buffer pointers related to state->in_imgs[].*/
+void od_update_buff(od_state *state)
 {
-  /*Increase # of input frames in io_imgs[] for encoding.*/
+  /*Increase # of input frames in in_imgs[] for encoding.*/
   state->frames_in_buff += 1;
   OD_ASSERT(state->frames_in_buff <= state->frame_delay);
   state->in_buff_ptr = (state->in_buff_ptr + 1) % state->frame_delay;
 
-  OD_ASSERT(in_buff_ptr);
-  if (state->in_buff_ptr > state->frame_delay)
-    state->in_buff_ptr = OD_FRAME_INPUT;
+  OD_ASSERT(in_buff_ptr >= 0 &&
+   in_buff_ptr < state->frame_delay);
 }
 
 
@@ -2056,7 +2062,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
       od_img_dump_padded(&enc->state);
     }
   #endif
-    od_buff_add(&enc->state);
+    od_update_buff(&enc->state);
   }
   /*If buffer is not filled as required, don't proceed to encoding.*/
   if (!last && enc->state.frames_in_buff < enc->state.frame_delay)
@@ -2102,9 +2108,9 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
 
   /*If P frame, the input frame is at tail, otherwise input is at head.*/
   if (frame_type == OD_P_FRAME )
-    enc->state.curr_in_frame_id = od_buff_tail(&enc->state);
+    enc->state.curr_in_frame_id = od_get_buff_tail(&enc->state);
   else
-    enc->state.curr_in_frame_id = od_buff_head(&enc->state);
+    enc->state.curr_in_frame_id = od_get_buff_head(&enc->state);
 
 
   /* Check if the frame should be a keyframe. */
@@ -2235,7 +2241,6 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   /*od_state_dump_img(&enc->state,
    enc->state.ref_img + enc->state.ref_imigi[OD_FRAME_SELF], "ref");*/
 #endif
-  enc->state.frames_in_buff -= 1;
 
   if (enc->state.info.frame_duration == 0) enc->state.cur_time += duration;
   else enc->state.cur_time += enc->state.info.frame_duration;
