@@ -68,7 +68,7 @@ extern const int OD_HAAR_QM[2][OD_LOG_BSIZE_MAX];
 /*The reconstructed I/O frame.*/
 # define OD_FRAME_REC   (0)
 /*The input I/O frame.*/
-# define OD_FRAME_INPUT (1)
+# define OD_FRAME_INPUT (0)
 
 /*Frame types.*/
 # define OD_I_FRAME (0)
@@ -180,7 +180,8 @@ struct od_state{
       them. */
   od_img              ref_imgs[4];
   /** Pointer to input and output image. */
-  od_img              io_imgs[2 + OD_NUM_B_FRAMES];
+    od_img              in_imgs[1];
+    od_img              out_imgs[1];
   /* ----------------------------------------------------- */
   /** Current frame number. */
   int           curr_frame_num;

@@ -119,7 +119,7 @@ int main(int _argc, char **_argv) {
     video_input_ycbcr in;
     int ret = 0;
     char tag[5];
-    od_img *simg = &state.io_imgs[OD_FRAME_REC];
+    od_img *simg = &state.out_imgs[OD_FRAME_REC];
     od_img *dimg = &state.ref_imgs[0];
     int x, y;
     ret = video_input_fetch_frame(&vid, in, tag);
