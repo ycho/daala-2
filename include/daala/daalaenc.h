@@ -112,7 +112,8 @@ int daala_encode_flush_header(daala_enc_ctx *enc,
  * \retval OD_EINVAL The image size does not match the frame size the encoder
  *                   was initialized with, or encoding has already
  *                    completed.*/
-int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration);
+int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
+ int last);
 /**Retrieves encoded video data packets.
  * This should be called repeatedly after each frame is submitted to flush any
  *  encoded packets, until it returns 0.
@@ -122,13 +123,14 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration);
  *        manner.
  *       However, this may be changed in the future.
  * \param enc A #daala_enc_ctx handle.
- * \param last Set this flag to a non-zero value if no more uncompressed
- *              frames will be submitted.
- *             This ensures that a proper EOS flag is set on the last packet.
  * \param op An <tt>ogg_packet</tt> structure to fill.
  *           All of the elements of this structure will be set, including a
  *            pointer to the video data.
  *           The memory for the video data is owned by <tt>libdaala</tt>.
+ * \param last Set this flag to a non-zero value if no more uncompressed
+ *              frames will be submitted.
+ *             This ensures that a proper EOS flag is set on the last packet.
+ *              as well as processing the delayed frames.
  * \return A positive value indicates that a video data packet was successfully
  *          produced.
  * \retval 0 No packet was produced, and no more encoded video data

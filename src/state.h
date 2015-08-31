@@ -181,11 +181,21 @@ struct od_state{
   od_img              ref_imgs[4];
   /** Pointer to input and output image. */
   od_img              io_imgs[2 + OD_NUM_B_FRAMES];
+  /* ----------------------------------------------------- */
+  /** Current frame number. */
+  int           curr_frame_num;
+  /** Frame delay. */
+  int           frame_delay;
+  /** Pointer to input frame in io_imgs[] buffer.*/
+  int           in_buff_ptr;
   /** Index for current input frame,
       if multiple input images are in io_imgs[]. */
   int           curr_in_frame_id;
-  /** # of frames in buffer to encode. */
+  /** # of frames left in buffer to encode. */
   int           frames_in_buff;
+  /** # of frames to encode after current frame is encoded. */
+  int           frames_to_encode;
+  /* ----------------------------------------------------- */
   unsigned char *ref_line_buf[8];
   unsigned char *ref_img_data;
   /** Increments by 1 for each frame. */

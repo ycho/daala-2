@@ -1386,9 +1386,12 @@ static void od_encode_mv(daala_enc_ctx *enc, od_mv_grid_pt *mvg, int vx,
   if (abs(oy)) od_ec_enc_bits(&enc->ec, oy < 0, 1);
 }
 
+/* Note : Only used for input input frames. */
 static void od_img_copy_pad(od_state *state, od_img *img) {
   int pli;
   int nplanes;
+  OD_ASSERT(state->in_buff_ptr >= OD_FRAME_INPUT &&
+   state->in_buff_ptr < 2 + OD_NUM_B_FRAMES);
   nplanes = img->nplanes;
   /* Copy and pad the image. */
   for (pli = 0; pli < nplanes; pli++) {
@@ -1402,11 +1405,11 @@ static void od_img_copy_pad(od_state *state, od_img *img) {
     ydec = plane.ydec;
     plane_width = ((state->info.pic_width + (1 << xdec) - 1) >> xdec);
     plane_height = ((state->info.pic_height + (1 << ydec) - 1) >> ydec);
-    od_img_plane_copy_pad8(&state->io_imgs[state->curr_in_frame_id].planes[pli],
+    od_img_plane_copy_pad8(&state->io_imgs[state->in_buff_ptr].planes[pli],
      state->frame_width >> xdec, state->frame_height >> ydec,
      &plane, plane_width, plane_height);
   }
-  od_img_edge_ext(state->io_imgs + state->curr_in_frame_id);
+  od_img_edge_ext(state->io_imgs + state->in_buff_ptr);
 }
 
 #if defined(OD_DUMP_IMAGES)
@@ -1989,7 +1992,35 @@ static void od_split_superblocks_rdo(daala_enc_ctx *enc,
   od_encode_rollback(enc, &rbuf);
 }
 
-int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
+int od_buff_head(od_state *state)
+{
+  int head;
+  head = (state->in_buff_ptr + 1) % state->frame_delay + 1;
+
+  return head;
+}
+
+int od_buff_tail(od_state *state)
+{
+  return (state->in_buff_ptr - 1) % state->frame_delay;
+}
+
+/*Update all buffer pointers related to state->io_imgs[].*/
+void od_buff_add(od_state *state)
+{
+  /*Increase # of input frames in io_imgs[] for encoding.*/
+  state->frames_in_buff += 1;
+  OD_ASSERT(state->frames_in_buff <= state->frame_delay);
+  state->in_buff_ptr = (state->in_buff_ptr + 1) % state->frame_delay;
+
+  OD_ASSERT(in_buff_ptr);
+  if (state->in_buff_ptr > state->frame_delay)
+    state->in_buff_ptr = OD_FRAME_INPUT;
+}
+
+
+int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
+     int last) {
   int refi;
   int nplanes;
   int pli;
@@ -2016,6 +2047,20 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
       return OD_EINVAL;
     }
   }
+  /*Buffer the input frames upto frame delay.*/
+  if (enc->state.frames_in_buff < enc->state.frame_delay)
+  {
+    od_img_copy_pad(&enc->state, img);
+  #if defined(OD_DUMP_IMAGES)
+    if (od_logging_active(OD_LOG_GENERIC, OD_LOG_DEBUG)) {
+      od_img_dump_padded(&enc->state);
+    }
+  #endif
+    od_buff_add(&enc->state);
+  }
+  /*If buffer is not filled as required, don't proceed to encoding.*/
+  if (!last && enc->state.frames_in_buff < enc->state.frame_delay)
+    return 0;
   use_masking = enc->use_activity_masking;
   frame_width = enc->state.frame_width;
   frame_height = enc->state.frame_height;
@@ -2032,7 +2077,6 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
   gop_size = enc->state.info.keyframe_rate;
   /*Decide a frame type based on the frame counter, enc->state.cur_time.*/
   /*We have a new field 'mbctx.frame_type' to store the frame type.*/
-  /* Check if the frame should be a keyframe. */
   frame_idx_in_gop = enc->state.cur_time % gop_size;
   frame_idx_in_subgop = frame_idx_in_gop % (OD_NUM_B_FRAMES + 1);
   if (frame_idx_in_gop == 0)
@@ -2052,39 +2096,27 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
   printf("frame %03d (frame idx in GOP %03d, idx in subGOP %d) : frame type %d\n",
      (int)enc->state.cur_time, frame_idx_in_gop, frame_idx_in_subgop, frame_type);
 
-  /*If current frame is P, we have 'the input frames for B' stored in buffer,
-    then we will return around here w/o doing actual encoding.*/
-  if (enc->state.frames_in_buff == 0)
-  {
-  /*Fixed as 1st input frame for now, so not using B frames.*/
-  enc->state.curr_in_frame_id = frame_idx_in_subgop + 1;
-  od_img_copy_pad(&enc->state, img);
+  /*Choose the input frame in buffer, based on frame type.*/
+  /*if (frame_type == OD_I_FRAME || frame_type == OD_P_FRAME)*/
+  /*enc->state.curr_in_frame_id = OD_FRAME_INPUT;*/
 
-#if defined(OD_DUMP_IMAGES)
-  if (od_logging_active(OD_LOG_GENERIC, OD_LOG_DEBUG)) {
-    od_img_dump_padded(&enc->state);
-  }
-#endif
-  /*# of frames left in io_imgs[] to encode.*/
-  enc->state.frames_in_buff += 1;
-  }
+  /*If P frame, the input frame is at tail, otherwise input is at head.*/
+  if (frame_type == OD_P_FRAME )
+    enc->state.curr_in_frame_id = od_buff_tail(&enc->state);
+  else
+    enc->state.curr_in_frame_id = od_buff_head(&enc->state);
 
-  /*if (mbctx.frame_type == OD_B_FRAME) {
-      return 0;
-    }*/
 
-  /*for (;frame_type == 3;)*/
-  {
   /* Check if the frame should be a keyframe. */
   mbctx.is_keyframe = (enc->state.cur_time %
    (enc->state.info.keyframe_rate) == 0) ? 1 : 0;
   mbctx.is_golden_frame = (enc->state.cur_time %
-   (OD_GOLDEN_FRAME_INTERVAL) == 0) ? 1 : 0;
+   (OD_GOLDEN_FRAME_INTERVAL) == 0) && (frame_type != OD_B_FRAME) ? 1 : 0;
   if (enc->state.ref_imgi[OD_FRAME_GOLD] < 0) {
     mbctx.is_golden_frame = 1;
   }
 
-  /*Update the buffer state.*/
+  /*Update the reference buffer state.*/
   if (enc->state.ref_imgi[OD_FRAME_SELF] >= 0) {
     enc->state.ref_imgi[OD_FRAME_PREV] =
      enc->state.ref_imgi[OD_FRAME_SELF];
@@ -2203,8 +2235,8 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration) {
   /*od_state_dump_img(&enc->state,
    enc->state.ref_img + enc->state.ref_imigi[OD_FRAME_SELF], "ref");*/
 #endif
-  enc->state.frames_in_buff += 1;
-  }
+  enc->state.frames_in_buff -= 1;
+
   if (enc->state.info.frame_duration == 0) enc->state.cur_time += duration;
   else enc->state.cur_time += enc->state.info.frame_duration;
   return 0;
