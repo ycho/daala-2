@@ -2026,7 +2026,7 @@ void od_update_buff(od_state *state)
 
 
 int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
-     int last) {
+     int last_frame, int *last_packet) {
   int refi;
   int nplanes;
   int pli;
@@ -2054,7 +2054,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
     }
   }
   /*Buffer the input frames upto frame delay.*/
-  if (enc->state.frames_in_buff < enc->state.frame_delay)
+  if (!last_frame && enc->state.frames_in_buff < enc->state.frame_delay)
   {
     od_img_copy_pad(&enc->state, img);
   #if defined(OD_DUMP_IMAGES)
@@ -2065,7 +2065,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
     od_update_buff(&enc->state);
   }
   /*If buffer is not filled as required, don't proceed to encoding.*/
-  if (!last && enc->state.frames_in_buff < enc->state.frame_delay)
+  if (!last_frame && enc->state.frames_in_buff < enc->state.frame_delay)
     return 0;
   use_masking = enc->use_activity_masking;
   frame_width = enc->state.frame_width;
@@ -2241,6 +2241,9 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   /*od_state_dump_img(&enc->state,
    enc->state.ref_img + enc->state.ref_imigi[OD_FRAME_SELF], "ref");*/
 #endif
+
+  /*If input buffer is empty, then signal that is is last packet.*/
+  *last_packet = enc->state.frames_in_buff ? 0 : 1;
 
   if (enc->state.info.frame_duration == 0) enc->state.cur_time += duration;
   else enc->state.cur_time += enc->state.info.frame_duration;

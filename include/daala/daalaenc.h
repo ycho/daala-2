@@ -113,7 +113,7 @@ int daala_encode_flush_header(daala_enc_ctx *enc,
  *                   was initialized with, or encoding has already
  *                    completed.*/
 int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
- int last);
+ int last_frame, int *last_packet);
 /**Retrieves encoded video data packets.
  * This should be called repeatedly after each frame is submitted to flush any
  *  encoded packets, until it returns 0.
@@ -127,10 +127,12 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
  *           All of the elements of this structure will be set, including a
  *            pointer to the video data.
  *           The memory for the video data is owned by <tt>libdaala</tt>.
- * \param last Set this flag to a non-zero value if no more uncompressed
+ * \param last_frame Set this flag to a non-zero value if no more uncompressed
  *              frames will be submitted.
+ *             TODO: Update below comment.
  *             This ensures that a proper EOS flag is set on the last packet.
  *              as well as processing the delayed frames.
+ * \param last_packet Returns one if the last packet is finished.
  * \return A positive value indicates that a video data packet was successfully
  *          produced.
  * \retval 0 No packet was produced, and no more encoded video data
