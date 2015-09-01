@@ -1992,7 +1992,7 @@ static void od_split_superblocks_rdo(daala_enc_ctx *enc,
   od_encode_rollback(enc, &rbuf);
 }
 
-int od_get_buff_head(od_state *state)
+static int od_get_buff_head(od_state *state)
 {
   int head;
   head = state->in_buff_head;
@@ -2002,7 +2002,7 @@ int od_get_buff_head(od_state *state)
   return head;
 }
 
-int od_get_buff_tail(od_state *state)
+static int od_get_buff_tail(od_state *state)
 {
   int tail;
   tail = (state->in_buff_ptr - 1) % state->frame_delay;
@@ -2013,17 +2013,36 @@ int od_get_buff_tail(od_state *state)
 }
 
 /*Update all buffer pointers related to state->in_imgs[].*/
-void od_update_buff(od_state *state)
+static void od_update_buff(od_state *state)
 {
   /*Increase # of input frames in in_imgs[] for encoding.*/
   state->frames_in_buff += 1;
   OD_ASSERT(state->frames_in_buff <= state->frame_delay);
   state->in_buff_ptr = (state->in_buff_ptr + 1) % state->frame_delay;
-
   OD_ASSERT(in_buff_ptr >= 0 &&
    in_buff_ptr < state->frame_delay);
 }
 
+/*Assume encoding order, I0 P1 B2 B3 P4 B5 B6 P7 ...*/
+/*Note: Must be called once and only once for each frame.*/
+static int determine_frame_type(od_state *state)
+{
+  int frame_type;
+  int idx_in_GOP;
+  int idx_in_PBB;
+  idx_in_GOP = state->frame_counter % state->info.keyframe_rate;
+  idx_in_PBB = (idx_in_GOP - 1) % (OD_NUM_B_FRAMES + 1);
+  if (idx_in_GOP == 0)
+    frame_type = OD_I_FRAME;
+  else if (idx_in_PBB == 0)
+    frame_type = OD_P_FRAME;
+  else
+    frame_type = OD_B_FRAME;
+  printf("frame %06ld (frame idx in GOP %03d, idx_in_PBB %2d) : frame type %d\n",
+   state->frame_counter, idx_in_GOP, idx_in_PBB, frame_type);
+  ++state->frame_counter;
+  return frame_type;
+}
 
 int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
      int last_frame, int *last_packet) {
@@ -2037,9 +2056,6 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   int use_masking;
   od_mb_enc_ctx mbctx;
   od_img *ref_img;
-  int gop_size;
-  int frame_idx_in_gop;
-  int frame_idx_in_subgop; /*IBB..B or PBB..B.*/
   int frame_type;
   if (enc == NULL || img == NULL) return OD_EFAULT;
   if (enc->packet_state == OD_PACKET_DONE) return OD_EINVAL;
@@ -2080,38 +2096,15 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
       return OD_EINVAL;
     }
   }
-  gop_size = enc->state.info.keyframe_rate;
-  /*Decide a frame type based on the frame counter, enc->state.cur_time.*/
-  /*We have a new field 'mbctx.frame_type' to store the frame type.*/
-  frame_idx_in_gop = enc->state.cur_time % gop_size;
-  frame_idx_in_subgop = frame_idx_in_gop % (OD_NUM_B_FRAMES + 1);
-  if (frame_idx_in_gop == 0)
-    frame_type = OD_I_FRAME;
-  else {
-    if (OD_NUM_B_FRAMES == 0)
-      frame_type = OD_P_FRAME;
-    else {
-      /*if (frame_idx_in_gop % (OD_NUM_B_FRAMES + 1))*/
-      if (frame_idx_in_subgop)
-        frame_type = OD_B_FRAME;
-      else
-        frame_type = OD_P_FRAME;
-    }
-  }
+  /*Determine a frame type.*/
+  frame_type = determine_frame_type(&enc->state);
   mbctx.frame_type = frame_type;
-  printf("frame %03d (frame idx in GOP %03d, idx in subGOP %d) : frame type %d\n",
-     (int)enc->state.cur_time, frame_idx_in_gop, frame_idx_in_subgop, frame_type);
-
-  /*Choose the input frame in buffer, based on frame type.*/
-  /*if (frame_type == OD_I_FRAME || frame_type == OD_P_FRAME)*/
-  /*enc->state.curr_in_frame_id = OD_FRAME_INPUT;*/
 
   /*If P frame, the input frame is at tail, otherwise input is at head.*/
   if (frame_type == OD_P_FRAME )
     enc->state.curr_in_frame_id = od_get_buff_tail(&enc->state);
   else
     enc->state.curr_in_frame_id = od_get_buff_head(&enc->state);
-
 
   /* Check if the frame should be a keyframe. */
   mbctx.is_keyframe = (enc->state.cur_time %

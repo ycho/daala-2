@@ -183,6 +183,8 @@ struct od_state{
   od_img              in_imgs[1 + OD_NUM_B_FRAMES];
   od_img              out_imgs[1];
   /* ----------------------------------------------------- */
+  /** Frame counter. */
+  uint64_t     frame_counter;
   /** Current frame number. */
   int           curr_frame_num;
   /** Frame delay. */
@@ -196,8 +198,6 @@ struct od_state{
   int           curr_in_frame_id;
   /** # of frames left in buffer to encode. */
   int           frames_in_buff;
-  /** # of frames to encode after current frame is encoded. */
-  int           frames_to_encode;
   /* ----------------------------------------------------- */
   unsigned char *ref_line_buf[8];
   unsigned char *ref_img_data;
