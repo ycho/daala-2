@@ -398,6 +398,7 @@ static int od_state_init_impl(od_state *state, const daala_info *info) {
   state->in_buff_head = 0;
   state->frames_in_buff = 0;
   state->frame_counter = 0;
+  state->display_order = 0;
   return OD_SUCCESS;
 }
 

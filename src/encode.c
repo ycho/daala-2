@@ -2038,8 +2038,15 @@ static int determine_frame_type(od_state *state)
     frame_type = OD_P_FRAME;
   else
     frame_type = OD_B_FRAME;
-  printf("frame %06ld (frame idx in GOP %03d, idx_in_PBB %2d) : frame type %d\n",
-   state->frame_counter, idx_in_GOP, idx_in_PBB, frame_type);
+  /*Update display order, or POC (Picture Order Counter).*/
+  if (frame_type == OD_I_FRAME)
+    state->display_order = state->frame_counter;
+  else if (frame_type == OD_P_FRAME)
+    state->display_order = state->frame_counter + OD_NUM_B_FRAMES;
+  else
+    state->display_order = state->frame_counter - 1;
+  printf("frame# : enc order %06ld, display order %06ld, (frame idx in GOP %03d) : frame type %d\n",
+   state->frame_counter, state->display_order, idx_in_GOP, frame_type);
   ++state->frame_counter;
   return frame_type;
 }
