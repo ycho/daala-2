@@ -171,6 +171,10 @@ static void od_enc_opt_vtbl_init(od_enc_ctx *enc) {
 static int od_enc_init(od_enc_ctx *enc, const daala_info *info) {
   int i;
   int ret;
+#if defined(OD_DUMP_BSIZE_DIST)
+  char dist_fname[1024];
+  const char *suf;
+#endif
   enc->state.codec_mode = 0;
   ret = od_state_init(&enc->state, info);
   if (ret < 0) return ret;
@@ -196,6 +200,23 @@ static int od_enc_init(od_enc_ctx *enc, const daala_info *info) {
 #if defined(OD_ENCODER_CHECK)
   enc->dec = daala_decode_alloc(info, NULL);
 #endif
+#if defined(OD_DUMP_BSIZE_DIST)
+  suf = getenv("OD_DUMP_BSIZE_DIST_SUFFIX");
+  if (!suf) {
+    suf = "dist";
+  }
+  sprintf(dist_fname, "%08i-%s.out",
+   (int)daala_granule_basetime(&enc->state, enc->state.cur_time), suf);
+  for (i = 0; i < OD_NPLANES_MAX; i++){
+    enc->bsize_dist[i] = 0.0;
+    enc->bsize_dist_total[i] = 0.0;
+  }
+  /* FIXME: something unique-ish maybe? */
+  enc->bsize_dist_file = fopen(dist_fname, "wb");
+  if (OD_UNLIKELY(enc->bsize_dist_file == NULL)) {
+    return OD_EFAULT;
+  }
+#endif
   return 0;
 }
 
@@ -218,6 +239,16 @@ daala_enc_ctx *daala_encode_create(const daala_info *info) {
 }
 
 void daala_encode_free(daala_enc_ctx *enc) {
+#if defined(OD_DUMP_BSIZE_DIST)
+    int i;
+    fprintf(enc->bsize_dist_file, "Total: ");
+    for (i = 0; i < enc->state.info.nplanes; i++){
+      fprintf(enc->bsize_dist_file, "%-7G\t",
+       10*log10(enc->bsize_dist_total[i]));
+    }
+    fprintf(enc->bsize_dist_file, "\n");
+    fclose(enc->bsize_dist_file);
+#endif
   if (enc != NULL) {
 #if defined(OD_ENCODER_CHECK)
     if (enc->dec != NULL) {
@@ -420,11 +451,13 @@ struct od_mb_enc_ctx {
   od_coeff *mc;
   od_coeff *l;
   int is_keyframe;
+  int num_refs;
   int use_activity_masking;
   int qm;
   int use_haar_wavelet;
   int is_golden_frame;
   int frame_type;
+  int q_scaling;
 };
 typedef struct od_mb_enc_ctx od_mb_enc_ctx;
 
@@ -752,13 +785,18 @@ static double od_compute_dist(daala_enc_ctx *enc, od_coeff *x, od_coeff *y,
         sum += od_compute_dist_8x8(enc, &x[i*n + j], &y[i*n + j], n, bs);
       }
     }
+    /* Compensate for the fact that the quantization matrix lowers the
+       distortion value. We tried a half-dozen values and picked the one where
+       we liked the ntt-short1 curves best. The tuning is approximate since
+       the different metrics go in different directions. */
+    sum *= 1.7;
   }
   return sum;
 }
 
 /* Computes block size RDO lambda (for 1/8 bits) from the quantizer. */
 static double od_bs_rdo_lambda(int q) {
-  return OD_BS_RDO_LAMBDA*(1./(1 << OD_BITRES))*q*q;
+  return OD_PVQ_LAMBDA*(1./(1 << OD_BITRES))*q*q;
 }
 
 /* Returns 1 if the block is skipped, zero otherwise. */
@@ -889,7 +927,8 @@ static int od_block_encode(daala_enc_ctx *enc, od_mb_enc_ctx *ctx, int bs,
   }
   else {
     skip = od_pvq_encode(enc, predt, dblock, scalar_out, quant, pli, bs,
-     OD_PVQ_BETA[use_masking][pli][bs], OD_ROBUST_STREAM, ctx->is_keyframe);
+     OD_PVQ_BETA[use_masking][pli][bs], OD_ROBUST_STREAM, ctx->is_keyframe,
+     ctx->q_scaling, bx, by);
   }
   if (!ctx->is_keyframe) {
     int has_dc_skip;
@@ -966,6 +1005,12 @@ static int od_block_encode(daala_enc_ctx *enc, od_mb_enc_ctx *ctx, int bs,
       od_encode_cdf_adapt(&enc->ec, 2,
        enc->state.adapt.skip_cdf[2*bs + (pli != 0)], 4 + (pli == 0 && bs > 0),
        enc->state.adapt.skip_increment);
+#if OD_SIGNAL_Q_SCALING
+      if (bs == (OD_NBSIZES - 1) && pli == 0) {
+        od_encode_quantizer_scaling(enc, 0,
+         bx >> (OD_NBSIZES - 1), by >> (OD_NBSIZES - 1), 1);
+      }
+#endif
       skip = 1;
       for (i = 0; i < n; i++) {
         for (j = 0; j < n; j++) {
@@ -1288,6 +1333,11 @@ static int od_encode_recursive(daala_enc_ctx *enc, od_mb_enc_ctx *ctx,
       od_encode_cdf_adapt(&enc->ec, 4,
        enc->state.adapt.skip_cdf[2*bs + (pli != 0)], 5,
        enc->state.adapt.skip_increment);
+#if OD_SIGNAL_Q_SCALING
+      if (bs == (OD_NBSIZES - 1)) {
+        od_encode_quantizer_scaling(enc, ctx->q_scaling, bx, by, 0);
+      }
+#endif
     }
     if (ctx->is_keyframe) {
       od_quantize_haar_dc_level(enc, ctx, pli, 2*bx, 2*by, bsi - 1, xdec,
@@ -1341,7 +1391,17 @@ static int od_encode_recursive(daala_enc_ctx *enc, od_mb_enc_ctx *ctx,
           }
         }
         skip_block = skip_nosplit;
+#if defined(OD_DUMP_BSIZE_DIST)
+        if (bsi == OD_NBSIZES - 2) {
+          enc->bsize_dist[pli] += dist_nosplit;
+        }
+#endif
       }
+#if defined(OD_DUMP_BSIZE_DIST)
+      else if (bsi == OD_NBSIZES - 2) {
+        enc->bsize_dist[pli] += dist_split;
+      }
+#endif
       for (i = 0; i < n; i++) {
         for (j = 0; j < n; j++) ctx->mc[bo + i*w + j] = mc_orig[n*i + j];
       }
@@ -1350,8 +1410,8 @@ static int od_encode_recursive(daala_enc_ctx *enc, od_mb_enc_ctx *ctx,
   }
 }
 
-static void od_encode_mv(daala_enc_ctx *enc, od_mv_grid_pt *mvg, int vx,
- int vy, int level, int mv_res, int mv_range_x, int mv_range_y) {
+static void od_encode_mv(daala_enc_ctx *enc, int num_refs, od_mv_grid_pt *mvg,
+ int vx, int vy, int level, int mv_res, int mv_range_x, int mv_range_y) {
   generic_encoder *model;
   int pred[2];
   int ox;
@@ -1359,12 +1419,15 @@ static void od_encode_mv(daala_enc_ctx *enc, od_mv_grid_pt *mvg, int vx,
   int id;
   int equal_mvs;
   int ref_pred;
-  /* Code reference index. */
-  ref_pred = od_mc_get_ref_predictor(&enc->state, vx, vy, level);
-  OD_ASSERT(ref_pred >= 0);
-  OD_ASSERT(ref_pred < OD_MAX_CODED_REFS);
-  od_encode_cdf_adapt(&enc->ec, mvg->ref,
-   enc->state.adapt.mv_ref_cdf[ref_pred], OD_MAX_CODED_REFS, 256);
+  if (num_refs > 1) {
+    /* Code reference index. */
+    ref_pred = od_mc_get_ref_predictor(&enc->state, vx, vy, level);
+    OD_ASSERT(ref_pred >= 0);
+    OD_ASSERT(ref_pred < num_refs);
+    OD_ASSERT(mvg->ref < num_refs);
+    od_encode_cdf_adapt(&enc->ec, mvg->ref,
+     enc->state.adapt.mv_ref_cdf[ref_pred], num_refs, 256);
+  }
   equal_mvs = od_state_get_predictor(&enc->state, pred, vx, vy, level,
    mv_res, mvg->ref);
   ox = (mvg->mv[0] >> mv_res) - pred[0];
@@ -1438,13 +1501,13 @@ static void od_predict_frame(daala_enc_ctx *enc) {
 #endif
   OD_LOG((OD_LOG_ENCODER, OD_LOG_INFO, "Predicting frame %i:",
    (int)daala_granule_basetime(enc, enc->state.cur_time)));
-  /*4000000 ~= 0.47684 (or sqrt(0.22738)) in Q23.
+  /*4640000 ~= 0.55313 (or sqrt(0.30595)) in Q23.
    The lower bound of 40 is there because we do not yet consider PVQ noref
     flags during the motion search, so we waste far too many bits trying to
     predict unpredictable areas when lambda is too small.
    Hopefully when we fix that, we can remove the limit.*/
   od_mv_est(enc->mvest,
-   OD_MAXI((4000000 + (((1 << OD_COEFF_SHIFT) - 1) >> 1) >> OD_COEFF_SHIFT)*
+   OD_MAXI((4640000 + (((1 << OD_COEFF_SHIFT) - 1) >> 1) >> OD_COEFF_SHIFT)*
    enc->quantizer[0] >> (23 - OD_LAMBDA_SCALE), 40));
   od_state_mc_predict(&enc->state);
   /*Do edge extension here because the block-size analysis needs to read
@@ -1515,7 +1578,7 @@ static void od_split_superblocks(daala_enc_ctx *enc, int is_keyframe) {
   }
 }
 
-static void od_encode_mvs(daala_enc_ctx *enc) {
+static void od_encode_mvs(daala_enc_ctx *enc, int num_refs) {
   int nhmvbs;
   int nvmvbs;
   int vx;
@@ -1544,7 +1607,7 @@ static void od_encode_mvs(daala_enc_ctx *enc) {
   for (vy = 0; vy <= nvmvbs; vy += OD_MVB_DELTA0) {
     for (vx = 0; vx <= nhmvbs; vx += OD_MVB_DELTA0) {
       mvp = grid[vy] + vx;
-      od_encode_mv(enc, mvp, vx, vy, 0, mv_res, width, height);
+      od_encode_mv(enc, num_refs, mvp, vx, vy, 0, mv_res, width, height);
     }
   }
   /*od_ec_acct_add_label(&enc->ec.acct, "mvf-l1");
@@ -1566,7 +1629,8 @@ static void od_encode_mvs(daala_enc_ctx *enc) {
           od_encode_cdf_adapt(&enc->ec, mvp->valid,
            cdf, 2, enc->state.adapt.split_flag_increment);
           if (mvp->valid) {
-            od_encode_mv(enc, mvp, vx, vy, level, mv_res, width, height);
+            od_encode_mv(enc, num_refs, mvp, vx, vy, level, mv_res,
+             width, height);
           }
         }
         else {
@@ -1587,7 +1651,8 @@ static void od_encode_mvs(daala_enc_ctx *enc) {
           od_encode_cdf_adapt(&enc->ec, mvp->valid,
            cdf, 2, enc->state.adapt.split_flag_increment);
           if (mvp->valid) {
-            od_encode_mv(enc, mvp, vx, vy, level, mv_res, width, height);
+            od_encode_mv(enc, num_refs, mvp, vx, vy, level, mv_res,
+             width, height);
           }
         }
         else {
@@ -1596,6 +1661,15 @@ static void od_encode_mvs(daala_enc_ctx *enc) {
       }
     }
   }
+}
+
+/* FIXME: add a real scaling calculation */
+static int od_compute_superblock_q_scaling(daala_enc_ctx *enc, od_coeff *x,
+ int stride) {
+  (void)enc;
+  (void)x;
+  (void)stride;
+  return 0;
 }
 
 #define OD_ENCODE_REAL (0)
@@ -1668,9 +1742,11 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
         od_coeff *c_orig;
         int i;
         int j;
+        int width;
         od_rollback_buffer buf;
         od_coeff hgrad;
         od_coeff vgrad;
+        width = enc->state.frame_width;
         hgrad = vgrad = 0;
         c_orig = enc->c_orig[0];
         mbctx->c = state->ctmp[pli];
@@ -1680,16 +1756,16 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
         mbctx->l = state->lbuf[pli];
         xdec = state->in_imgs[state->curr_in_frame_id].planes[pli].xdec;
         ydec = state->in_imgs[state->curr_in_frame_id].planes[pli].ydec;
-        if (mbctx->is_keyframe) {
-          int width;
-          width = enc->state.frame_width;
-          if (rdo_only) {
-            for (i = 0; i < OD_BSIZE_MAX; i++) {
-              for (j = 0; j < OD_BSIZE_MAX; j++) {
-                c_orig[i*OD_BSIZE_MAX + j] =
-                 mbctx->c[(OD_BSIZE_MAX*sby + i)*width + OD_BSIZE_MAX*sbx + j];
-              }
+        if (pli == 0 || rdo_only && mbctx->is_keyframe) {
+          for (i = 0; i < OD_BSIZE_MAX; i++) {
+            for (j = 0; j < OD_BSIZE_MAX; j++) {
+              c_orig[i*OD_BSIZE_MAX + j] =
+               mbctx->c[(OD_BSIZE_MAX*sby + i)*width + OD_BSIZE_MAX*sbx + j];
             }
+          }
+        }
+        if (mbctx->is_keyframe) {
+          if (rdo_only) {
             od_encode_checkpoint(enc, &buf);
           }
           od_compute_dcts(enc, mbctx, pli, sbx, sby, OD_NBSIZES - 1, xdec,
@@ -1705,6 +1781,10 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
               }
             }
           }
+        }
+        if (pli == 0 && enc->quantizer[pli] != 0) {
+          mbctx->q_scaling =
+           od_compute_superblock_q_scaling(enc, c_orig, OD_BSIZE_MAX);
         }
         skipped = od_encode_recursive(enc, mbctx, pli, sbx, sby,
          OD_NBSIZES - 1, xdec, ydec, rdo_only, hgrad, vgrad);
@@ -1852,14 +1932,10 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
     if (!rdo_only && enc->quantizer[0] > 0) {
       for (sby = 0; sby < nvsb; sby++) {
         for (sbx = 0; sbx < nhsb; sbx++) {
-          if (mbctx->is_keyframe && OD_BLOCK_SIZE4x4(enc->state.bsize,
-           enc->state.bstride, sbx << (OD_NBSIZES - 1),
-           sby << (OD_NBSIZES - 1)) == OD_NBSIZES - 1) {
-            int ln;
-            OD_ASSERT(xdec == ydec);
-            ln = OD_LOG_BSIZE_MAX - xdec;
-            od_bilinear_smooth(&state->ctmp[pli][(sby << ln)*w + (sbx << ln)],
-             ln, w, enc->quantizer[pli], pli);
+          if (mbctx->is_keyframe) {
+            od_smooth_recursive(state->ctmp[pli], enc->state.bsize,
+             enc->state.bstride, sbx, sby, OD_NBSIZES - 1, w, xdec, ydec,
+             OD_BLOCK_32X32, enc->quantizer[pli], pli);
           }
         }
       }
@@ -2134,8 +2210,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   enc->state.ref_imgi[OD_FRAME_SELF] = refi;
   /*We must be a keyframe if we don't have a reference.*/
   mbctx.is_keyframe |= !(enc->state.ref_imgi[OD_FRAME_PREV] >= 0);
-  if (mbctx.is_keyframe)
-    mbctx.frame_type = OD_I_FRAME;
+  mbctx.num_refs = mbctx.is_keyframe ? 0 : OD_MAX_CODED_REFS;
   /* FIXME: This should be dynamic */
   mbctx.use_activity_masking = enc->use_activity_masking;
   mbctx.qm = enc->qm;
@@ -2149,6 +2224,10 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   od_ec_encode_bool_q15(&enc->ec, 0, 16384);
   /*Code the keyframe bit.*/
   od_ec_encode_bool_q15(&enc->ec, mbctx.is_keyframe, 16384);
+  /* Code the number of references. */
+  if (!mbctx.is_keyframe) {
+    od_ec_enc_uint(&enc->ec, mbctx.num_refs - 1, OD_MAX_CODED_REFS);
+  }
   /*Code whether or not activity masking is being used.*/
   od_ec_encode_bool_q15(&enc->ec, mbctx.use_activity_masking, 16384);
   /*Code whether flat or hvs quantization matrices are being used.
@@ -2211,7 +2290,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
 #endif
   if (!mbctx.is_keyframe) {
     od_predict_frame(enc);
-    od_encode_mvs(enc);
+    od_encode_mvs(enc, mbctx.num_refs);
   }
   /* Enable block size RDO for all but complexity 0 and 1. We might want to
      revise that choice if we get a better open-loop block size algorithm. */
@@ -2247,6 +2326,16 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
 
   if (enc->state.info.frame_duration == 0) enc->state.cur_time += duration;
   else enc->state.cur_time += enc->state.info.frame_duration;
+#if defined(OD_DUMP_BSIZE_DIST)
+  for (pli = 0; pli < nplanes; pli++){
+    /* Write value for this frame and reset it */
+    fprintf(enc->bsize_dist_file, "%-7G\t",
+     10*log10(enc->bsize_dist[pli]));
+    enc->bsize_dist_total[pli] += enc->bsize_dist[pli];
+    enc->bsize_dist[pli] = 0.0;
+  }
+  fprintf(enc->bsize_dist_file, "\n");
+#endif
   return 0;
 }
 

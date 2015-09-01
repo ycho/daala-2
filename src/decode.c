@@ -172,8 +172,8 @@ static void od_dec_init_dummy_frame(daala_dec_ctx *dec) {
   od_dec_blank_img(dec->state.ref_imgs + dec->state.ref_imgi[OD_FRAME_SELF]);
 }
 
-static void od_decode_mv(daala_dec_ctx *dec, od_mv_grid_pt *mvg, int vx,
- int vy, int level, int mv_res, int width, int height) {
+static void od_decode_mv(daala_dec_ctx *dec, int num_refs, od_mv_grid_pt *mvg,
+ int vx, int vy, int level, int mv_res, int width, int height) {
   generic_encoder *model;
   int pred[2];
   int ox;
@@ -181,12 +181,16 @@ static void od_decode_mv(daala_dec_ctx *dec, od_mv_grid_pt *mvg, int vx,
   int id;
   int equal_mvs;
   int ref_pred;
-  ref_pred = od_mc_get_ref_predictor(&dec->state, vx, vy, level);
-  OD_ASSERT(ref_pred >= 0);
-  OD_ASSERT(ref_pred < OD_MAX_CODED_REFS);
-  mvg->ref = od_decode_cdf_adapt(&dec->ec,
-   dec->state.adapt.mv_ref_cdf[ref_pred], OD_MAX_CODED_REFS, 256,
-   "mv:ref");
+  if (num_refs > 1) {
+    ref_pred = od_mc_get_ref_predictor(&dec->state, vx, vy, level);
+    OD_ASSERT(ref_pred >= 0);
+    OD_ASSERT(ref_pred < num_refs);
+    mvg->ref = od_decode_cdf_adapt(&dec->ec,
+     dec->state.adapt.mv_ref_cdf[ref_pred], num_refs, 256,
+     "mv:ref");
+  } else {
+    mvg->ref = OD_FRAME_PREV;
+  }
   equal_mvs = od_state_get_predictor(&dec->state, pred, vx, vy, level,
    mv_res, mvg->ref);
   model = &dec->state.adapt.mv_model;
@@ -215,6 +219,7 @@ struct od_mb_dec_ctx {
   od_coeff *mc;
   od_coeff *l;
   int is_keyframe;
+  int num_refs;
   int use_activity_masking;
   int qm;
   int use_haar_wavelet;
@@ -646,6 +651,33 @@ static void od_decode_haar_dc_level(daala_dec_ctx *dec, od_mb_dec_ctx *ctx, int 
   ctx->d[pli][((by + 1) << ln)*w + ((bx + 1) << ln)] = x[3];
 }
 
+#if OD_SIGNAL_Q_SCALING
+static void od_decode_quantizer_scaling(daala_dec_ctx *dec, int bx, int by,
+ int skip) {
+  int sbx;
+  int sby;
+  int q_scaling;
+  OD_ASSERT(skip == !!skip);
+  sbx = bx;
+  sby = by;
+  if (!skip) {
+    int above;
+    int left;
+    above = sby > 0 ? dec->state.sb_q_scaling[(sby - 1)*dec->state.nhsb + sbx]
+     : 0;
+    left = sbx > 0 ? dec->state.sb_q_scaling[sby*dec->state.nhsb + (sbx - 1)]
+     : 0;
+    q_scaling = od_decode_cdf_adapt(&dec->ec,
+     dec->state.adapt.q_cdf[above + left*4], 4,
+     dec->state.adapt.q_increment, "quant");
+  }
+  else {
+    q_scaling = 0;
+  }
+  dec->state.sb_q_scaling[sby*dec->state.nhsb + sbx] = q_scaling;
+}
+#endif
+
 static void od_decode_recursive(daala_dec_ctx *dec, od_mb_dec_ctx *ctx, int pli,
  int bx, int by, int bsi, int xdec, int ydec, od_coeff hgrad, od_coeff vgrad) {
   int obs;
@@ -672,6 +704,9 @@ static void od_decode_recursive(daala_dec_ctx *dec, od_mb_dec_ctx *ctx, int pli,
     /*Save superblock skip value for use by CLP filter.*/
     if (bsi == OD_NBSIZES - 1) {
       dec->state.sb_skip_flags[by*dec->state.nhsb + bx] = skip == 2;
+#if OD_SIGNAL_Q_SCALING
+      od_decode_quantizer_scaling(dec, bx, by, skip == 2);
+#endif
     }
     if (skip < 4) obs = bsi;
     else obs = -1;
@@ -744,7 +779,7 @@ static void od_decode_recursive(daala_dec_ctx *dec, od_mb_dec_ctx *ctx, int pli,
   }
 }
 
-static void od_dec_mv_unpack(daala_dec_ctx *dec) {
+static void od_dec_mv_unpack(daala_dec_ctx *dec, int num_refs) {
   int nhmvbs;
   int nvmvbs;
   int vx;
@@ -777,7 +812,7 @@ static void od_dec_mv_unpack(daala_dec_ctx *dec) {
       OD_ACCOUNTING_SET_LOCATION(dec, OD_ACCT_MV, 0, vx, vy);
       mvp = grid[vy] + vx;
       mvp->valid = 1;
-      od_decode_mv(dec, mvp, vx, vy, 0, mv_res, width, height);
+      od_decode_mv(dec, num_refs, mvp, vx, vy, 0, mv_res, width, height);
     }
   }
   for (log_mvb_sz = OD_LOG_MVB_DELTA0, level = 1; log_mvb_sz-- > 0; level++) {
@@ -796,7 +831,8 @@ static void od_dec_mv_unpack(daala_dec_ctx *dec) {
           mvp->valid = od_decode_cdf_adapt(&dec->ec,
            cdf, 2, dec->state.adapt.split_flag_increment, "mv:valid");
           if (mvp->valid) {
-            od_decode_mv(dec, mvp, vx, vy, level, mv_res, width, height);
+            od_decode_mv(dec, num_refs, mvp, vx, vy, level, mv_res,
+             width, height);
           }
         }
       }
@@ -815,7 +851,8 @@ static void od_dec_mv_unpack(daala_dec_ctx *dec) {
           mvp->valid = od_decode_cdf_adapt(&dec->ec,
            cdf, 2, dec->state.adapt.split_flag_increment, "mv:valid");
           if (mvp->valid) {
-            od_decode_mv(dec, mvp, vx, vy, level, mv_res, width, height);
+            od_decode_mv(dec, num_refs, mvp, vx, vy, level, mv_res,
+             width, height);
           }
         }
       }
@@ -983,14 +1020,10 @@ static void od_decode_coefficients(od_dec_ctx *dec, od_mb_dec_ctx *mbctx) {
     {
       for (sby = 0; sby < nvsb; sby++) {
         for (sbx = 0; sbx < nhsb; sbx++) {
-          if (mbctx->is_keyframe &&
-           OD_BLOCK_SIZE4x4(dec->state.bsize, dec->state.bstride,
-           sbx << (OD_NBSIZES - 1), sby << (OD_NBSIZES - 1)) == OD_NBSIZES - 1) {
-            int ln;
-            OD_ASSERT(xdec == ydec);
-            ln = OD_LOG_BSIZE_MAX - xdec;
-            od_bilinear_smooth(&state->ctmp[pli][(sby << ln)*w + (sbx << ln)],
-             ln, w, dec->quantizer[pli], pli);
+          if (mbctx->is_keyframe) {
+            od_smooth_recursive(state->ctmp[pli], dec->state.bsize,
+             dec->state.bstride, sbx, sby, OD_NBSIZES - 1, w, xdec, ydec,
+             OD_BLOCK_32X32, dec->quantizer[pli], pli);
           }
         }
       }
@@ -1034,6 +1067,11 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
   /*Read the packet type bit.*/
   if (od_ec_decode_bool_q15(&dec->ec, 16384, "flags")) return OD_EBADPACKET;
   mbctx.is_keyframe = od_ec_decode_bool_q15(&dec->ec, 16384, "flags");
+  if (!mbctx.is_keyframe) {
+    mbctx.num_refs = od_ec_dec_uint(&dec->ec, OD_MAX_CODED_REFS, "flags") + 1;
+  } else {
+    mbctx.num_refs = 0;
+  }
   mbctx.use_activity_masking = od_ec_decode_bool_q15(&dec->ec, 16384, "flags");
   mbctx.qm = od_ec_decode_bool_q15(&dec->ec, 16384, "flags");
   mbctx.use_haar_wavelet = od_ec_decode_bool_q15(&dec->ec, 16384, "flags");
@@ -1069,7 +1107,7 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
   dec->state.ref_imgi[OD_FRAME_SELF] = refi;
   od_adapt_ctx_reset(&dec->state.adapt, mbctx.is_keyframe);
   if (!mbctx.is_keyframe) {
-    od_dec_mv_unpack(dec);
+    od_dec_mv_unpack(dec, mbctx.num_refs);
     od_state_mc_predict(&dec->state);
     if (dec->user_mc_img != NULL) {
       od_img_copy(dec->user_mc_img, &dec->state.out_imgs[OD_FRAME_REC]);

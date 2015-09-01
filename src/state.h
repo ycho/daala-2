@@ -39,12 +39,6 @@ typedef struct od_adapt_ctx      od_adapt_ctx;
 # include "generic_code.h"
 #include "intra.h"
 
-/* Normalized RDO lambda used for the block size decision
-   (different from quantization lambda). Tuned on subset1 and ntt-short
-   although it's hard to tune since FASTSSIM and PSNRHVS go in opposite
-   directions (did some visual inspection). */
-#define OD_BS_RDO_LAMBDA (.08)
-
 extern const od_coeff OD_DC_RES[3];
 
 extern const od_coeff OD_DC_QM[2][OD_NBSIZES - 1][2];
@@ -162,6 +156,10 @@ struct od_adapt_ctx {
   int haar_bits_increment;
   uint16_t clpf_cdf[4][2];
   int clpf_increment;
+  /* 4 possible values for the sblock above (or skip), 4 for the sblock to the
+     left (or skip). */
+  uint16_t q_cdf[4*4][4];
+  int q_increment;
 };
 
 struct od_state{
@@ -256,6 +254,8 @@ struct od_state{
   /*These flags provide context for the CLP filter.*/
   unsigned char *clpf_flags;
   unsigned char *sb_skip_flags;
+  /*This provides context for the quantizer CDF.*/
+  unsigned char *sb_q_scaling;
 };
 
 int od_state_init(od_state *_state, const daala_info *_info);

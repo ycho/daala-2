@@ -298,6 +298,14 @@ AS_IF([test "$enable_dump_recons" = "yes"], [
   AC_DEFINE([OD_DUMP_RECONS], [1], [Enable reconstructed video dumping])
 ])
 
+AC_ARG_ENABLE([dump-bsize-dist],
+  AS_HELP_STRING([--enable-dump-bsize-dist],
+   [Dump block size RDO distortion]),, [enable_dump_bsize_dist=no])
+AS_IF([test "$enable_dump_bsize_dist" = "yes"], [
+  AC_DEFINE([OD_DUMP_BSIZE_DIST], [1],
+   [Enable block size RDO distortion dumping])
+])
+
 AC_ARG_ENABLE([accounting],
   AS_HELP_STRING([--enable-accounting], [Enable bit accounting]),
   [if test "$host_mingw" = "true"; then AC_MSG_ERROR([accounting not supported on Windows]); fi],
@@ -355,7 +363,6 @@ AC_MSG_NOTICE([
     Image dumping ................ ${enable_dump_images}
     MC Animation  ................ ${enable_mc_animate}
     Reconstructed video dumping .. ${enable_dump_recons}
-    Transform coeffs dumping ..... ${enable_dump_coeffs}
     Check encoder ................ ${enable_encoder_check}
     Check DCT overflow............ ${enable_dct_check_overflow}
     Check assembly................ ${enable_check_asm}
