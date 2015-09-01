@@ -290,12 +290,13 @@ int fetch_and_process_video(av_input *avin, ogg_page *page,
  ogg_stream_state *vo, daala_enc_ctx *dd, int video_ready,
  int *limit, int *skip) {
   ogg_packet op;
+  int last_packet;
+  last_packet = 0;
   while (!video_ready) {
     size_t ret;
     char frame[6];
     char c;
     int last_frame;
-    int last_packet;
     if (ogg_stream_pageout(vo, page) > 0) return 1;
     else if (ogg_stream_eos(vo) || (limit && (*limit) < 0)) return 0;
     ret = fread(frame, 1, 6, avin->video_infile);
