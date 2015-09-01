@@ -2164,8 +2164,12 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
     od_update_buff(&enc->state);
   }
   /*If buffer is not filled as required, don't proceed to encoding.*/
-  if (enc->state.frames_in_buff < enc->state.frame_delay)
+  if (!last_frame && enc->state.frames_in_buff < enc->state.frame_delay)
+  {
+    printf("frames_in_buff = %d, last_frame = %d, last_packet = %d\n",
+     enc->state.frames_in_buff, last_frame, *last_packet);
     return 0;
+  }
   use_masking = enc->use_activity_masking;
   frame_width = enc->state.frame_width;
   frame_height = enc->state.frame_height;
@@ -2322,7 +2326,14 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
 #endif
 
   /*If input buffer is empty, then signal that it is the last packet.*/
-  *last_packet = enc->state.frames_in_buff ? 0 : 1;
+  /**last_packet = (enc->state.frames_in_buff == 0);*/
+  if (enc->state.frames_in_buff)
+    *last_packet = 0;
+  else
+    *last_packet = 1;
+
+  printf("frames_in_buff = %d, last_frame = %d, last_packet = %d\n",
+   enc->state.frames_in_buff, last_frame, *last_packet);
 
   if (enc->state.info.frame_duration == 0) enc->state.cur_time += duration;
   else enc->state.cur_time += enc->state.info.frame_duration;

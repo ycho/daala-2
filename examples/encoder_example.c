@@ -290,15 +290,18 @@ int fetch_and_process_video(av_input *avin, ogg_page *page,
  ogg_stream_state *vo, daala_enc_ctx *dd, int video_ready,
  int *limit, int *skip) {
   ogg_packet op;
-  int last_packet;
-  last_packet = 0;
+  static int last_frame = 0;
+  static int last_packet = 0;
   while (!video_ready) {
     size_t ret;
     char frame[6];
     char c;
-    int last_frame;
-    if (ogg_stream_pageout(vo, page) > 0) return 1;
-    else if (ogg_stream_eos(vo) || (limit && (*limit) < 0)) return 0;
+    if (ogg_stream_pageout(vo, page) > 0)
+      return 1;
+    else if (ogg_stream_eos(vo))
+      return 0;
+    if (!last_frame)
+    {
     ret = fread(frame, 1, 6, avin->video_infile);
     if (ret == 6) {
       od_img *img;
@@ -339,12 +342,14 @@ int fetch_and_process_video(av_input *avin, ogg_page *page,
         continue;
       }
       if (limit) {
-        last_frame = (*limit) == 0;
+        last_frame = (*limit) <= 0;
         (*limit)--;
       }
-      else last_frame = 0;
+      else
+        last_frame = 0;
     }
     else last_frame = 1;
+    }
     /*Pull the packets from the previous frame, now that we know whether or not
        we can read the current one.
       This is used to set the e_o_s bit on the final packet.*/
@@ -353,9 +358,10 @@ int fetch_and_process_video(av_input *avin, ogg_page *page,
     }
     /*Submit the current frame for encoding.*/
     /*If B frames are used, then daala_encode_img_in() will store
-      the input frames for B in in_imgs[], until it can encode B frames
-      after P frame is encoded.*/
-    daala_encode_img_in(dd, &avin->video_img, 0, last_frame, &last_packet);
+      the input frames for B in in_imgs[] (i.e. frame delay),
+      until it can encode B frames after P frame is encoded.*/
+    if (!last_packet)
+      daala_encode_img_in(dd, &avin->video_img, 0, last_frame, &last_packet);
   }
   return video_ready;
 }
@@ -496,7 +502,7 @@ int main(int argc, char **argv) {
   video_bytesout = 0;
   fixedserial = 0;
   skip = 0;
-  limit = -1;
+  limit = -2;
   complexity = 7;
   mc_use_chroma = 1;
   mc_use_satd = 0;
@@ -746,7 +752,7 @@ int main(int argc, char **argv) {
     double video_fps = avin.video_fps_n/avin.video_fps_d;
     size_t bytes_written;
     video_ready = fetch_and_process_video(&avin, &video_page, &vo,
-     dd, video_ready, limit >= 0 ? &limit : NULL, skip > 0 ? &skip : NULL);
+     dd, video_ready, limit != 0 ? &limit : NULL, skip > 0 ? &skip : NULL);
     /*TODO: Fetch the next video page.*/
     /*If no more pages are available, we've hit the end of the stream.*/
     if (!video_ready) break;
