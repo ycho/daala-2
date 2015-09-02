@@ -2330,7 +2330,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
 #endif
   if (enc->state.frame_delay > 1)
   {
-    /*If input buffer is empty, then signal that it is the last packet.*/
+    /*If input buffer is empty, signal that it is the last output frame.*/
     last_out_frame = (enc->state.frames_in_buff == 0);
   }
   else
