@@ -2331,7 +2331,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   if (OD_NUM_B_FRAMES > 0)
   {
     /*If input buffer is empty, signal that it is the last output frame.*/
-    last_out_frame = (enc->state.frames_in_buff == 0);
+    *last_out_frame = (enc->state.frames_in_buff == 0);
   }
   else
     *last_out_frame = last_in_frame;
