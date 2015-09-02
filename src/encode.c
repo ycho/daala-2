@@ -2081,9 +2081,9 @@ static int od_get_buff_head(od_state *state)
 static int od_get_buff_tail(od_state *state)
 {
   int tail;
-  tail = (state->in_buff_ptr - 1) % state->frame_delay;
+  tail = (state->in_buff_ptr - 1 + state->frame_delay) % state->frame_delay;
   /*Update the head of in_buff[].*/
-  state->in_buff_ptr = (tail - 1) % state->frame_delay;
+  state->in_buff_ptr = (tail - 1 + state->frame_delay) % state->frame_delay;
   state->frames_in_buff -= 1;
   return tail;
 }
@@ -2153,7 +2153,8 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
     }
   }
   /*Buffer the input frames upto frame delay.*/
-  if (!last_frame && enc->state.frames_in_buff < enc->state.frame_delay)
+  if (enc->state.frame_delay <= 1 ||
+   (!last_frame && enc->state.frames_in_buff < enc->state.frame_delay))
   {
     od_img_copy_pad(&enc->state, img);
   #if defined(OD_DUMP_IMAGES)
@@ -2327,11 +2328,15 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
 
   /*If input buffer is empty, then signal that it is the last packet.*/
   /**last_packet = (enc->state.frames_in_buff == 0);*/
-  if (enc->state.frames_in_buff)
-    *last_packet = 0;
+  if (enc->state.frame_delay > 1)
+  {
+    if (enc->state.frames_in_buff)
+      *last_packet = 0;
+    else
+      *last_packet = 1;
+  }
   else
-    *last_packet = 1;
-
+    *last_packet = last_frame;
   printf("frames_in_buff = %d, last_frame = %d, last_packet = %d\n",
    enc->state.frames_in_buff, last_frame, *last_packet);
 

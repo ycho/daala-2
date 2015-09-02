@@ -342,8 +342,8 @@ int fetch_and_process_video(av_input *avin, ogg_page *page,
         continue;
       }
       if (limit) {
-        last_frame = (*limit) <= 0;
         (*limit)--;
+        last_frame = (*limit) <= 0;
       }
       else
         last_frame = 0;
@@ -752,7 +752,7 @@ int main(int argc, char **argv) {
     double video_fps = avin.video_fps_n/avin.video_fps_d;
     size_t bytes_written;
     video_ready = fetch_and_process_video(&avin, &video_page, &vo,
-     dd, video_ready, limit != 0 ? &limit : NULL, skip > 0 ? &skip : NULL);
+     dd, video_ready, limit > -2 ? &limit : NULL, skip > 0 ? &skip : NULL);
     /*TODO: Fetch the next video page.*/
     /*If no more pages are available, we've hit the end of the stream.*/
     if (!video_ready) break;
