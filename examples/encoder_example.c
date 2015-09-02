@@ -302,53 +302,53 @@ int fetch_and_process_video(av_input *avin, ogg_page *page,
       return 0;
     if (!last_in_frame)
     {
-    ret = fread(frame, 1, 6, avin->video_infile);
-    if (ret == 6) {
-      od_img *img;
-      int pli;
-      if (memcmp(frame, "FRAME", 5) != 0) {
-        fprintf(stderr, "Loss of framing in YUV input data.\n");
-        exit(1);
-      }
-      if (frame[5] != '\n') {
-        int bi;
-        for (bi = 0; bi < 121; bi++) {
-          if (fread(&c, 1, 1, avin->video_infile) == 1 && c == '\n') break;
-        }
-        if (bi >= 121) {
-          fprintf(stderr, "Error parsing YUV frame header.\n");
+      ret = fread(frame, 1, 6, avin->video_infile);
+      if (ret == 6) {
+        od_img *img;
+        int pli;
+        if (memcmp(frame, "FRAME", 5) != 0) {
+          fprintf(stderr, "Loss of framing in YUV input data.\n");
           exit(1);
         }
-      }
-      /*Read the frame data.*/
-      img = &avin->video_img;
-      for (pli = 0; pli < img->nplanes; pli++) {
-        od_img_plane *iplane;
-        size_t plane_sz;
-        iplane = img->planes + pli;
-        plane_sz = ((avin->video_pic_w + (1 << iplane->xdec) - 1)
-         >> iplane->xdec)*((avin->video_pic_h + (1 << iplane->ydec)
-         - 1) >> iplane->ydec);
-        ret = fread(iplane->data/* + (avin->video_pic_y >> iplane->ydec)
-         *iplane->ystride + (avin->video_picx >> iplane->xdec)*/, 1, plane_sz,
-         avin->video_infile);
-        if (ret != plane_sz) {
-          fprintf(stderr, "Error reading YUV frame data.\n");
-          exit(1);
+        if (frame[5] != '\n') {
+          int bi;
+          for (bi = 0; bi < 121; bi++) {
+            if (fread(&c, 1, 1, avin->video_infile) == 1 && c == '\n') break;
+          }
+          if (bi >= 121) {
+            fprintf(stderr, "Error parsing YUV frame header.\n");
+            exit(1);
+          }
         }
+        /*Read the frame data.*/
+        img = &avin->video_img;
+        for (pli = 0; pli < img->nplanes; pli++) {
+          od_img_plane *iplane;
+          size_t plane_sz;
+          iplane = img->planes + pli;
+          plane_sz = ((avin->video_pic_w + (1 << iplane->xdec) - 1)
+           >> iplane->xdec)*((avin->video_pic_h + (1 << iplane->ydec)
+           - 1) >> iplane->ydec);
+          ret = fread(iplane->data/* + (avin->video_pic_y >> iplane->ydec)
+           *iplane->ystride + (avin->video_picx >> iplane->xdec)*/, 1, plane_sz,
+           avin->video_infile);
+          if (ret != plane_sz) {
+            fprintf(stderr, "Error reading YUV frame data.\n");
+            exit(1);
+          }
+        }
+        if (skip && (*skip) > 0) {
+          (*skip)--;
+          continue;
+        }
+        if (limit) {
+          (*limit)--;
+          last_in_frame = (*limit) <= 0;
+        }
+        else
+          last_in_frame = 0;
       }
-      if (skip && (*skip) > 0) {
-        (*skip)--;
-        continue;
-      }
-      if (limit) {
-        (*limit)--;
-        last_in_frame = (*limit) <= 0;
-      }
-      else
-        last_in_frame = 0;
-    }
-    else last_in_frame = 1;
+      else last_in_frame = 1;
     }
     /*Pull the packets from the previous frame, now that we know whether or not
        we can read the current one.
