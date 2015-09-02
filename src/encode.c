@@ -2162,7 +2162,6 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
       od_img_dump_padded(&enc->state);
     }
   #endif
-    if (enc->state.frame_delay > 1)
       od_update_buff(&enc->state);
   }
   /*If buffer is not filled as required, don't proceed to encoding.*/
