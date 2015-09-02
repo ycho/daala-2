@@ -1224,7 +1224,7 @@ void od_state_fill_vis(od_state *state) {
   /*Upsample the input image, as well, and subtract it to get a difference
      image.*/
   ref_img = &state->tmp_vis_img;
-  od_state_upsample8(state, ref_img, &state->in_imgs[state->curr_in_frame_id]);
+  od_state_upsample8(state, ref_img, &state->in_imgs[state->curr_frame]);
   xdec = state->info.plane_info[0].xdec;
   ydec = state->info.plane_info[0].ydec;
   for (y = 0; y < ref_img->height; y++) {
