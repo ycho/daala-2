@@ -2187,7 +2187,6 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   /*Determine a frame type.*/
   frame_type = determine_frame_type(&enc->state);
   mbctx.frame_type = frame_type;
-
   /*If P frame, the input frame is at tail, otherwise input is at head.*/
   if (OD_NUM_B_FRAMES > 0)
   {
@@ -2197,19 +2196,44 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
       enc->state.curr_frame = od_get_buff_head(&enc->state);
   }
   /* Check if the frame should be a keyframe. */
-  mbctx.is_keyframe = (enc->state.cur_time %
-   (enc->state.info.keyframe_rate) == 0) ? 1 : 0;
+  mbctx.is_keyframe = (frame_type == OD_I_FRAME) ? 1 : 0;
   /* B-frame cannot be a Golden frame.*/
   mbctx.is_golden_frame = (enc->state.cur_time %
    (OD_GOLDEN_FRAME_INTERVAL) == 0) && (frame_type != OD_B_FRAME) ? 1 : 0;
   if (enc->state.ref_imgi[OD_FRAME_GOLD] < 0) {
     mbctx.is_golden_frame = 1;
   }
-
   /*Update the reference buffer state.*/
+  /*B frames cannot be set as reference frames.*/
+  if (frame_type == OD_I_FRAME)
+  {
+    int imgi;
+    /*Mark all of the reference frames are not available.*/
+    for (imgi = 0; imgi < 4; imgi++) enc->state.ref_imgi[imgi] = -1;
+  }
   if (enc->state.ref_imgi[OD_FRAME_SELF] >= 0) {
-    enc->state.ref_imgi[OD_FRAME_PREV] =
-     enc->state.ref_imgi[OD_FRAME_SELF];
+    if (OD_NUM_B_FRAMES == 0) {
+      enc->state.ref_imgi[OD_FRAME_PREV] =
+       enc->state.ref_imgi[OD_FRAME_SELF];
+    }
+    else {
+      if (frame_type != OD_B_FRAME) {
+        /*1st P frame in GOP?*/
+        if (enc->state.ref_imgi[OD_FRAME_PREV] < 0 &&
+         enc->state.ref_imgi[OD_FRAME_NEXT] < 0) {
+          /*Only previous reference frame (i.e. I frame) is available.*/
+          enc->state.ref_imgi[OD_FRAME_PREV] =
+           enc->state.ref_imgi[OD_FRAME_SELF];
+        }
+        else {
+          /*Update two reference frames.*/
+          enc->state.ref_imgi[OD_FRAME_PREV] =
+           enc->state.ref_imgi[OD_FRAME_NEXT];
+          enc->state.ref_imgi[OD_FRAME_NEXT] =
+           enc->state.ref_imgi[OD_FRAME_SELF];
+        }
+      }
+    }
   }
   /*Select a free buffer to use for this reference frame.*/
   for (refi = 0; refi == enc->state.ref_imgi[OD_FRAME_GOLD]
@@ -2217,8 +2241,13 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
    || refi == enc->state.ref_imgi[OD_FRAME_NEXT]; refi++);
   enc->state.ref_imgi[OD_FRAME_SELF] = refi;
   /*We must be a keyframe if we don't have a reference.*/
-  mbctx.is_keyframe |= !(enc->state.ref_imgi[OD_FRAME_PREV] >= 0);
-  mbctx.num_refs = mbctx.is_keyframe ? 0 : OD_MAX_CODED_REFS;
+  if (enc->state.ref_imgi[OD_FRAME_PREV] < 0)
+  {
+    mbctx.is_keyframe = 1;
+    frame_type = OD_I_FRAME;
+  }
+  /*Only P frame can use golden reference frame.*/
+  mbctx.num_refs = (frame_type == OD_P_FRAME) ? OD_MAX_CODED_REFS : 0;
   /* FIXME: This should be dynamic */
   mbctx.use_activity_masking = enc->use_activity_masking;
   mbctx.qm = enc->qm;
@@ -2233,7 +2262,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   /*Code the keyframe bit.*/
   od_ec_encode_bool_q15(&enc->ec, mbctx.is_keyframe, 16384);
   /* Code the number of references. */
-  if (!mbctx.is_keyframe) {
+  if (frame_type == OD_P_FRAME) {
     od_ec_enc_uint(&enc->ec, mbctx.num_refs - 1, OD_MAX_CODED_REFS);
   }
   /*Code whether or not activity masking is being used.*/
