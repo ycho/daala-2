@@ -397,6 +397,7 @@ static int od_state_init_impl(od_state *state, const daala_info *info) {
   state->frame_delay = OD_NUM_B_FRAMES + 1;
   state->in_buff_ptr = 0;
   state->in_buff_head = 0;
+  state->curr_frame = 0;
   state->frames_in_buff = 0;
   state->frame_counter = 0;
   state->display_order = 0;

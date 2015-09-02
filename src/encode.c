@@ -2153,7 +2153,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
     }
   }
   /*Buffer the input frames upto frame delay.*/
-  if (enc->state.frame_delay <= 1 ||
+  if (enc->state.frame_delay == 1 ||
    (!last_in_frame && enc->state.frames_in_buff < enc->state.frame_delay))
   {
     od_img_copy_pad(&enc->state, img);
@@ -2162,12 +2162,13 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
       od_img_dump_padded(&enc->state);
     }
   #endif
-    od_update_buff(&enc->state);
+    if (enc->state.frame_delay > 1)
+      od_update_buff(&enc->state);
   }
   /*If buffer is not filled as required, don't proceed to encoding.*/
   if (!last_in_frame && enc->state.frames_in_buff < enc->state.frame_delay)
   {
-    printf("frames_in_buff = %d, last_in_frame = %d, last_out_frame = %d\n",
+    printf("frames_in_buff = %d, last_in_frame? %d, last_out_frame? %d\n",
      enc->state.frames_in_buff, last_in_frame, *last_out_frame);
     return 0;
   }
@@ -2189,11 +2190,13 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   mbctx.frame_type = frame_type;
 
   /*If P frame, the input frame is at tail, otherwise input is at head.*/
-  if (frame_type == OD_P_FRAME )
-    enc->state.curr_frame = od_get_buff_tail(&enc->state);
-  else
-    enc->state.curr_frame = od_get_buff_head(&enc->state);
-
+  if (enc->state.frame_delay > 1)
+  {
+    if (frame_type == OD_P_FRAME )
+      enc->state.curr_frame = od_get_buff_tail(&enc->state);
+    else
+      enc->state.curr_frame = od_get_buff_head(&enc->state);
+  }
   /* Check if the frame should be a keyframe. */
   mbctx.is_keyframe = (enc->state.cur_time %
    (enc->state.info.keyframe_rate) == 0) ? 1 : 0;
@@ -2336,7 +2339,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   }
   else
     *last_out_frame = last_in_frame;
-  printf("frames_in_buff = %d, last_in_frame = %d, last_out_frame = %d\n",
+  printf("frames_in_buff = %d, last_in_frame? %d, last_out_frame? %d\n",
    enc->state.frames_in_buff, last_in_frame, *last_out_frame);
 
   if (enc->state.info.frame_duration == 0) enc->state.cur_time += duration;
