@@ -2153,7 +2153,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
     }
   }
   /*Buffer the input frames upto frame delay.*/
-  if (enc->state.frame_delay == 1 ||
+  if (OD_NUM_B_FRAMES == 0 ||
    (!last_in_frame && enc->state.frames_in_buff < enc->state.frame_delay))
   {
     od_img_copy_pad(&enc->state, img);
@@ -2189,7 +2189,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   mbctx.frame_type = frame_type;
 
   /*If P frame, the input frame is at tail, otherwise input is at head.*/
-  if (enc->state.frame_delay > 1)
+  if (OD_NUM_B_FRAMES > 0)
   {
     if (frame_type == OD_P_FRAME )
       enc->state.curr_frame = od_get_buff_tail(&enc->state);
@@ -2328,7 +2328,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   /*od_state_dump_img(&enc->state,
    enc->state.ref_img + enc->state.ref_imigi[OD_FRAME_SELF], "ref");*/
 #endif
-  if (enc->state.frame_delay > 1)
+  if (OD_NUM_B_FRAMES > 0)
   {
     /*If input buffer is empty, signal that it is the last output frame.*/
     last_out_frame = (enc->state.frames_in_buff == 0);
