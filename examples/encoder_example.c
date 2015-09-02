@@ -357,9 +357,9 @@ int fetch_and_process_video(av_input *avin, ogg_page *page,
       ogg_stream_packetin(vo, &op);
     }
     /*Submit the current frame for encoding.*/
-    /*If B frames are used, then daala_encode_img_in() will store
-      the input frames for B in in_imgs[] (i.e. frame delay),
-      until it can encode B frames after P frame is encoded.*/
+    /*If B frames are used, then daala_encode_img_in() will buffer
+       the input frames for B in in_imgs[] (i.e. frame delay),
+       until it encode P frame.*/
     if (!last_out_frame)
       daala_encode_img_in(dd, &avin->video_img, 0, last_in_frame, &last_out_frame);
   }

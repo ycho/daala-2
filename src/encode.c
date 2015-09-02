@@ -2199,6 +2199,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   /* Check if the frame should be a keyframe. */
   mbctx.is_keyframe = (enc->state.cur_time %
    (enc->state.info.keyframe_rate) == 0) ? 1 : 0;
+  /* B-frame cannot be a Golden frame.*/
   mbctx.is_golden_frame = (enc->state.cur_time %
    (OD_GOLDEN_FRAME_INTERVAL) == 0) && (frame_type != OD_B_FRAME) ? 1 : 0;
   if (enc->state.ref_imgi[OD_FRAME_GOLD] < 0) {
@@ -2330,17 +2331,12 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   if (enc->state.frame_delay > 1)
   {
     /*If input buffer is empty, then signal that it is the last packet.*/
-    /**last_out_frame = (enc->state.frames_in_buff == 0);*/
-    if (enc->state.frames_in_buff)
-      *last_out_frame = 0;
-    else
-      *last_out_frame = 1;
+    last_out_frame = (enc->state.frames_in_buff == 0);
   }
   else
     *last_out_frame = last_in_frame;
   printf("frames_in_buff = %d, last_in_frame? %d, last_out_frame? %d\n",
    enc->state.frames_in_buff, last_in_frame, *last_out_frame);
-
   if (enc->state.info.frame_duration == 0) enc->state.cur_time += duration;
   else enc->state.cur_time += enc->state.info.frame_duration;
 #if defined(OD_DUMP_BSIZE_DIST)
