@@ -2204,37 +2204,20 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
     mbctx.is_golden_frame = 1;
   }
   /*Update the reference buffer state.*/
-  /*B frames cannot be set as reference frames.*/
+  if (frame_type == OD_P_FRAME) {
+    enc->state.ref_imgi[OD_FRAME_PREV] =
+     enc->state.ref_imgi[OD_FRAME_NEXT];
+    enc->state.ref_imgi[OD_FRAME_NEXT] = -1;
+  }
+  /*TODO: Need this if closed GOP.*/
+#if 0
   if (frame_type == OD_I_FRAME)
   {
     int imgi;
     /*Mark all of the reference frames are not available.*/
     for (imgi = 0; imgi < 4; imgi++) enc->state.ref_imgi[imgi] = -1;
   }
-  if (enc->state.ref_imgi[OD_FRAME_SELF] >= 0) {
-    if (OD_NUM_B_FRAMES == 0) {
-      enc->state.ref_imgi[OD_FRAME_PREV] =
-       enc->state.ref_imgi[OD_FRAME_SELF];
-    }
-    else {
-      if (frame_type != OD_B_FRAME) {
-        /*1st P frame in GOP?*/
-        if (enc->state.ref_imgi[OD_FRAME_PREV] < 0 &&
-         enc->state.ref_imgi[OD_FRAME_NEXT] < 0) {
-          /*Only previous reference frame (i.e. I frame) is available.*/
-          enc->state.ref_imgi[OD_FRAME_PREV] =
-           enc->state.ref_imgi[OD_FRAME_SELF];
-        }
-        else {
-          /*Update two reference frames.*/
-          enc->state.ref_imgi[OD_FRAME_PREV] =
-           enc->state.ref_imgi[OD_FRAME_NEXT];
-          enc->state.ref_imgi[OD_FRAME_NEXT] =
-           enc->state.ref_imgi[OD_FRAME_SELF];
-        }
-      }
-    }
-  }
+#endif
   /*Select a free buffer to use for this reference frame.*/
   for (refi = 0; refi == enc->state.ref_imgi[OD_FRAME_GOLD]
    || refi == enc->state.ref_imgi[OD_FRAME_PREV]
@@ -2348,11 +2331,37 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   OD_ASSERT(ref_img);
   od_img_copy(ref_img, enc->state.out_imgs + OD_FRAME_REC);
   od_img_edge_ext(ref_img);
+  /*Update the reference buffer state.*/
   if (mbctx.is_golden_frame) {
     enc->state.ref_imgi[OD_FRAME_GOLD] =
      enc->state.ref_imgi[OD_FRAME_SELF];
   }
-#if defined(OD_DUMP_IMAGES)
+  /*B frames cannot be set as reference frames.*/
+  if (OD_NUM_B_FRAMES == 0) {
+    enc->state.ref_imgi[OD_FRAME_PREV] =
+     enc->state.ref_imgi[OD_FRAME_SELF];
+  }
+  else {
+    if (frame_type != OD_B_FRAME) {
+      /*1st P frame in GOP?*/
+      if (enc->state.ref_imgi[OD_FRAME_PREV] < 0 &&
+       enc->state.ref_imgi[OD_FRAME_NEXT] < 0) {
+        /*Only previous reference frame (i.e. I frame) is available.*/
+        enc->state.ref_imgi[OD_FRAME_PREV] =
+         enc->state.ref_imgi[OD_FRAME_SELF];
+        enc->state.ref_imgi[OD_FRAME_NEXT] =
+         enc->state.ref_imgi[OD_FRAME_SELF];
+      }
+      else {
+        /*Update two reference frames.*/
+        enc->state.ref_imgi[OD_FRAME_PREV] =
+         enc->state.ref_imgi[OD_FRAME_NEXT];
+        enc->state.ref_imgi[OD_FRAME_NEXT] =
+         enc->state.ref_imgi[OD_FRAME_SELF];
+      }
+    }
+  }
+ #if defined(OD_DUMP_IMAGES)
   /*Dump reference frame.*/
   /*od_state_dump_img(&enc->state,
    enc->state.ref_img + enc->state.ref_imigi[OD_FRAME_SELF], "ref");*/
@@ -2378,6 +2387,8 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   }
   fprintf(enc->bsize_dist_file, "\n");
 #endif
+
+
   return 0;
 }
 
