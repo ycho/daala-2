@@ -2207,7 +2207,6 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   if (frame_type == OD_P_FRAME) {
     enc->state.ref_imgi[OD_FRAME_PREV] =
      enc->state.ref_imgi[OD_FRAME_NEXT];
-    enc->state.ref_imgi[OD_FRAME_NEXT] = -1;
   }
   /*TODO: Need this if closed GOP.*/
 #if 0
@@ -2343,7 +2342,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   }
   else {
     if (frame_type != OD_B_FRAME) {
-      /*1st P frame in GOP?*/
+      /*1st P frame in closed GOP or 1st P in the sequence with open GOP?*/
       if (enc->state.ref_imgi[OD_FRAME_PREV] < 0 &&
        enc->state.ref_imgi[OD_FRAME_NEXT] < 0) {
         /*Only previous reference frame (i.e. I frame) is available.*/
