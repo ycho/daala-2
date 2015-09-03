@@ -2101,16 +2101,19 @@ static void od_update_buff(od_state *state)
 
 /*Assume encoding order, I0 P1 B2 B3 P4 B5 B6 P7 ..., if # of B frames = 2.*/
 /*Note: Must be called once and only once before encoding each frame.*/
+/*Known issue: If P or I is the last frame and if the # of last B frames
+   in sequence is not OD_NUM_B_FRAMES, then display_order_count will increase
+   more since we have no way to lookahead how many B-frames are left.*/
 static int determine_frame_type(od_state *state)
 {
   int frame_type;
   int idx_in_GOP;
   int idx_in_PBB;
   static int prev_frame_type = -1;
+  idx_in_GOP = state->enc_order_count % state->info.keyframe_rate;
   /* Not a 1st frame?*/
   if (state->enc_order_count)
   {
-    idx_in_GOP = state->enc_order_count % state->info.keyframe_rate;
     idx_in_PBB = (idx_in_GOP - 1)% (OD_NUM_B_FRAMES + 1);
     /*If open GOP with B frames > 0, encoding order and display order of
        I frame is different (except the 1st I frame).*/
