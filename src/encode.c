@@ -2099,31 +2099,55 @@ static void od_update_buff(od_state *state)
    in_buff_ptr < state->frame_delay);
 }
 
-/*Assume encoding order, I0 P1 B2 B3 P4 B5 B6 P7 ...*/
-/*Note: Must be called once and only once for each frame.*/
+/*Assume encoding order, I0 P1 B2 B3 P4 B5 B6 P7 ..., if # of B frames = 2.*/
+/*Note: Must be called once and only once before encoding each frame.*/
 static int determine_frame_type(od_state *state)
 {
   int frame_type;
   int idx_in_GOP;
   int idx_in_PBB;
-  idx_in_GOP = state->frame_counter % state->info.keyframe_rate;
-  idx_in_PBB = (idx_in_GOP - 1) % (OD_NUM_B_FRAMES + 1);
-  if (idx_in_GOP == 0)
+  static int prev_frame_type = -1;
+  /* Not a 1st frame?*/
+  if (state->enc_order_count)
+  {
+    idx_in_GOP = state->enc_order_count % state->info.keyframe_rate;
+    idx_in_PBB = (idx_in_GOP - 1)% (OD_NUM_B_FRAMES + 1);
+    /*If open GOP with B frames > 0, encoding order and display order of
+       I frame is different (except the 1st I frame).*/
+  #if OD_NUM_B_FRAMES && !OD_CLOSED_GOP
+    if (idx_in_GOP == (state->info.keyframe_rate - OD_NUM_B_FRAMES))
+  #else
+    if (idx_in_GOP == 0)
+  #endif
+      frame_type = OD_I_FRAME;
+    else if (idx_in_PBB == 0)
+      frame_type = OD_P_FRAME;
+    else
+      frame_type = OD_B_FRAME;
+    /*Update display order, or POC (Picture Order Counter).*/
+    if (OD_CLOSED_GOP && frame_type == OD_I_FRAME)
+      state->display_order_count = state->enc_order_count;
+    else if ((!OD_CLOSED_GOP && frame_type == OD_I_FRAME) ||
+          frame_type == OD_P_FRAME)
+      state->display_order_count = state->enc_order_count + OD_NUM_B_FRAMES;
+    else
+    {
+      if (prev_frame_type == OD_P_FRAME ||
+       (!OD_CLOSED_GOP && prev_frame_type == OD_I_FRAME))
+        state->display_order_count = state->enc_order_count - 1;
+      else
+        state->display_order_count = state->display_order_count + 1;
+    }
+  }
+  else
+  { /*1st frame.*/
     frame_type = OD_I_FRAME;
-  else if (idx_in_PBB == 0)
-    frame_type = OD_P_FRAME;
-  else
-    frame_type = OD_B_FRAME;
-  /*Update display order, or POC (Picture Order Counter).*/
-  if (frame_type == OD_I_FRAME)
-    state->display_order = state->frame_counter;
-  else if (frame_type == OD_P_FRAME)
-    state->display_order = state->frame_counter + OD_NUM_B_FRAMES;
-  else
-    state->display_order = state->frame_counter - 1;
+    state->display_order_count = 0;
+  }
+  prev_frame_type = frame_type;
   printf("frame# : enc order %06ld, display order %06ld, (frame idx in GOP %03d) : frame type %d\n",
-   state->frame_counter, state->display_order, idx_in_GOP, frame_type);
-  ++state->frame_counter;
+   state->enc_order_count, state->display_order_count, idx_in_GOP, frame_type);
+  ++state->enc_order_count;
   return frame_type;
 }
 
@@ -2190,7 +2214,8 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   /*If P frame, the input frame is at tail, otherwise input is at head.*/
   if (OD_NUM_B_FRAMES > 0)
   {
-    if (frame_type == OD_P_FRAME )
+    if (frame_type == OD_P_FRAME ||
+     (!OD_CLOSED_GOP && frame_type == OD_I_FRAME))
       enc->state.curr_frame = od_get_buff_tail(&enc->state);
     else
       enc->state.curr_frame = od_get_buff_head(&enc->state);

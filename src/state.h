@@ -182,9 +182,9 @@ struct od_state{
   od_img              out_imgs[1];
   /* ----------------------------------------------------- */
   /** Frame counter in encoding/decoding order. */
-  uint64_t     frame_counter;
+  uint64_t     enc_order_count;
   /** Frame counter in displaying order. */
-  uint64_t     display_order;
+  uint64_t     display_order_count;
   /** Frame delay. */
   int           frame_delay;
   /** Tail pointer of in_imgs[]. */
