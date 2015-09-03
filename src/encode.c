@@ -2208,8 +2208,8 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
     enc->state.ref_imgi[OD_FRAME_PREV] =
      enc->state.ref_imgi[OD_FRAME_NEXT];
   }
-  /*TODO: Need this if closed GOP.*/
-#if 0
+  /*Note: Enable this if closed GOP.*/
+#if OD_CLOSED_GOP
   if (frame_type == OD_I_FRAME)
   {
     int imgi;
@@ -2386,8 +2386,6 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   }
   fprintf(enc->bsize_dist_file, "\n");
 #endif
-
-
   return 0;
 }
 

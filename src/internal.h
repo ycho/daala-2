@@ -89,6 +89,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 /*Number of B frames between two reference frames. 0 means no B frames.*/
 # define OD_NUM_B_FRAMES (2)
+# define OD_CLOSED_GOP (0)
 # define OD_ROBUST_STREAM (0)
 
 # define OD_USE_HAAR_WAVELET (0)
