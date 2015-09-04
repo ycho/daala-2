@@ -2213,7 +2213,6 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   }
   /*Determine a frame type.*/
   frame_type = determine_frame_type(&enc->state);
-  mbctx.frame_type = frame_type;
   /*If P frame, the input frame is at tail, otherwise input is at head.*/
   if (OD_NUM_B_FRAMES > 0)
   {
@@ -2256,6 +2255,8 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
     mbctx.is_keyframe = 1;
     frame_type = OD_I_FRAME;
   }
+  mbctx.frame_type = frame_type;
+  enc->state.frame_type = frame_type;
   /*Only P frame can use golden reference frame.*/
   mbctx.num_refs = (frame_type == OD_P_FRAME) ? OD_MAX_CODED_REFS : 0;
   /* FIXME: This should be dynamic */

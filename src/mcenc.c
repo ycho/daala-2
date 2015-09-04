@@ -6206,12 +6206,22 @@ void od_mv_est(od_mv_est_ctx *est, int lambda) {
   /*Use SAD for stages here after.*/
   est->compute_distortion = od_enc_sad8;
   od_mv_est_init_mvs(est, OD_FRAME_PREV, 1);
-  /* At very high lambdas, the signaling overhead of multiref is too high. */
-  if (lambda < 150) {
-    if (state->ref_imgi[OD_FRAME_GOLD] >= 0) {
-      od_mv_est_init_mvs(est, OD_FRAME_GOLD, 0);
+  if (est->enc->state.frame_type == OD_P_FRAME) {
+    /*At very high lambdas, the signaling overhead of multiref is too high.*/
+    if (lambda < 150) {
+      if (state->ref_imgi[OD_FRAME_GOLD] >= 0) {
+        od_mv_est_init_mvs(est, OD_FRAME_GOLD, 0);
+      }
     }
   }
+  else
+  {
+    if (state->ref_imgi[OD_FRAME_NEXT] >= 0) {
+      od_mv_est_init_mvs(est, OD_FRAME_NEXT, 0);
+    }
+    /*Bidirectional ME.*/
+  }
+
   od_mv_est_decimate(est);
   /*This threshold is somewhat arbitrary.
     Chen and Willson use 6000 (with SSD as an error metric).
