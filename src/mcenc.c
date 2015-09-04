@@ -2277,6 +2277,53 @@ static int32_t od_mv_est_bma_sad8(od_mv_est_ctx *est,
   return ret;
 }
 
+/*Computes the SAD of a whole-pel BMA block with bidirectional prediction.*/
+static int32_t od_mv_est_bipred_bma_sad8(od_mv_est_ctx *est,
+ int ref, int bx, int by,
+ int mvx0, int mvy0, int mvx1, int mvy1, int log_mvb_sz) {
+  od_state *state;
+  od_img_plane *iplane;
+  int32_t ret;
+  int refi;
+  int dx;
+  int dy;
+  state = &est->enc->state;
+  refi = state->ref_imgi[ref];
+  iplane = state->ref_imgs[refi].planes + 0;
+  OD_ASSERT(iplane->xdec == 0 && iplane->ydec == 0);
+  dx = bx + mvx0;
+  dy = by + mvy0;
+  /*TODO: Modify od_enc_sad8() which get SAD from bidirectionally blending.*/
+  ret = od_enc_sad8(est->enc, iplane->data + dy *iplane->ystride + dx,
+   iplane->ystride, 1, 0, bx, by, log_mvb_sz + OD_LOG_MVBSIZE_MIN);
+  if (est->flags & OD_MC_USE_CHROMA) {
+    int pli;
+    unsigned char *ref_img;
+    for (pli = 1; pli < state->in_imgs[state->curr_frame].nplanes;
+     pli++) {
+      iplane = state->ref_imgs[refi].planes + pli;
+      OD_ASSERT(((bx + (1 << iplane->xdec) - 1) & ~((1 << iplane->xdec) - 1))
+       == bx);
+      OD_ASSERT(((by + (1 << iplane->ydec) - 1) & ~((1 << iplane->ydec) - 1))
+       == by);
+      /*If the input chroma plane is sub-sampled, then the candidate block with
+         subpel position for BMA search is interpolated at block level.*/
+      ref_img = iplane->data + (by >> iplane->ydec)*iplane->ystride
+       + (bx >> iplane->xdec);
+      od_mc_predict1fmv8_c(state->mc_buf[4], ref_img, iplane->ystride,
+       mvx0 << (3 - iplane->xdec), mvy0 << (3 - iplane->ydec),
+       log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane->xdec,
+       log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane->ydec);
+      /*Then, calculate SAD between a target block and the subpel interpolated
+         MC block.*/
+      ret += od_enc_sad8(est->enc, state->mc_buf[4],
+       1 << (log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane->xdec),
+       1, pli, bx, by, log_mvb_sz + OD_LOG_MVBSIZE_MIN) >> OD_MC_CHROMA_SCALE;
+    }
+  }
+  return ret;
+}
+
 /*Computes the SAD of a block with the given parameters.*/
 static int32_t od_mv_est_sad8(od_mv_est_ctx *est,
  int vx, int vy, int oc, int s, int log_mvb_sz) {
@@ -2825,6 +2872,31 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
 #endif
   /*previous_cost is our previous best cost from a previous pass of phase 1.*/
   previous_cost = (mv->bma_sad << OD_ERROR_SCALE) + mv->mv_rate*est->lambda;
+#if OD_NUM_B_FRAMES
+  /*Current frame is B and its 2nd (i.e. backward) prediction?*/
+  if (state->frame_type == OD_B_FRAME && ref == OD_FRAME_NEXT) {
+  /*Try bi-directional blended MC here then choose the best mode.*/
+    int32_t sad;
+    int32_t cost;
+    int rate;
+    /*Forward MV.*/
+    int mvx0;
+    int mvy0;
+    /*Backward MV.*/
+    int mvx1 = best_vec[0];
+    int mvy1 = best_vec[1];
+    mvx0 = mv->bma_mvs[0][OD_FRAME_PREV][0];
+    mvy0 = mv->bma_mvs[0][OD_FRAME_PREV][1];
+    mvx1 = best_vec[0];
+    mvy1 = best_vec[1];
+    /*Block matching with Bidirectional prediction.*/
+    sad = od_mv_est_bipred_bma_sad8(est, ref, bx, by,
+     mvx0, mvy0, mvx1, mvy1, log_mvb_sz);
+    /*rate = od_mv_est_bits(est, equal_mvs,
+     candx << 1, candy << 1, pred[0], pred[1], ref, ref_pred);
+    cost = (sad << OD_ERROR_SCALE) + rate*est->lambda;*/
+  }
+#endif
   if (must_update || (best_cost < previous_cost)) {
     OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
      "Found a better SAD then previous best."));
