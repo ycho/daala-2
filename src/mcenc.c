@@ -2282,43 +2282,91 @@ static int32_t od_mv_est_bipred_bma_sad8(od_mv_est_ctx *est,
  int ref, int bx, int by,
  int mvx0, int mvy0, int mvx1, int mvy1, int log_mvb_sz) {
   od_state *state;
-  od_img_plane *iplane;
+  od_img_plane *iplane0;
+  od_img_plane *iplane1;
   int32_t ret;
-  int refi;
-  int dx;
-  int dy;
+  int refi0;
+  int refi1;
+  int dx0;
+  int dy0;
+  int dx1;
+  int dy1;
+  int w;
+  int h;
+  int x;
+  int y;
+  uint8_t blended_blk[OD_MVBSIZE_MAX*OD_MVBSIZE_MAX];
+  uint8_t *ref0;
+  uint8_t *ref1;
+  uint8_t ref0_pel;
+  uint8_t ref1_pel;
   state = &est->enc->state;
-  refi = state->ref_imgi[ref];
-  iplane = state->ref_imgs[refi].planes + 0;
-  OD_ASSERT(iplane->xdec == 0 && iplane->ydec == 0);
-  dx = bx + mvx0;
-  dy = by + mvy0;
+  refi0 = state->ref_imgi[OD_FRAME_PREV];
+  refi1 = state->ref_imgi[OD_FRAME_NEXT];
+  iplane0 = state->ref_imgs[refi0].planes + 0;
+  iplane1 = state->ref_imgs[refi1].planes + 0;
+  OD_ASSERT(iplane0->xdec == 0 && iplane0->ydec == 0);
+  dx0 = bx + mvx0;
+  dy0 = by + mvy0;
+  dx1 = bx + mvx1;
+  dy1 = by + mvy1;
   /*TODO: Modify od_enc_sad8() which get SAD from bidirectionally blending.*/
-  ret = od_enc_sad8(est->enc, iplane->data + dy *iplane->ystride + dx,
-   iplane->ystride, 1, 0, bx, by, log_mvb_sz + OD_LOG_MVBSIZE_MIN);
+  /*Create blended ref image from two bi-directionally predicted images.*/
+  ref0 = iplane0->data + dy0 *iplane0->ystride + dx0;
+  ref1 = iplane1->data + dy1 *iplane1->ystride + dx1;
+  w = 1 << (log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane0->xdec);
+  h = 1 << (log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane0->ydec);
+  for (y=0; y<h; y++) {
+    for (x=0; x<w; x++) {
+      ref0_pel = *(ref0 + y*iplane0->ystride + x);
+      ref1_pel = *(ref1 + y*iplane1->ystride + x);
+      blended_blk[y*w + x] = (ref0_pel + ref1_pel + 1) >> 1;
+    }
+  }
+  ret = od_enc_sad8(est->enc, blended_blk, w, 1, 0,
+   bx, by, log_mvb_sz + OD_LOG_MVBSIZE_MIN);
   if (est->flags & OD_MC_USE_CHROMA) {
     int pli;
     unsigned char *ref_img;
     for (pli = 1; pli < state->in_imgs[state->curr_frame].nplanes;
      pli++) {
-      iplane = state->ref_imgs[refi].planes + pli;
-      OD_ASSERT(((bx + (1 << iplane->xdec) - 1) & ~((1 << iplane->xdec) - 1))
+      iplane0 = state->ref_imgs[refi0].planes + pli;
+      iplane1 = state->ref_imgs[refi1].planes + pli;
+      OD_ASSERT(((bx + (1 << iplane0->xdec) - 1) & ~((1 << iplane0->xdec) - 1))
        == bx);
-      OD_ASSERT(((by + (1 << iplane->ydec) - 1) & ~((1 << iplane->ydec) - 1))
+      OD_ASSERT(((by + (1 << iplane0->ydec) - 1) & ~((1 << iplane0->ydec) - 1))
        == by);
       /*If the input chroma plane is sub-sampled, then the candidate block with
          subpel position for BMA search is interpolated at block level.*/
-      ref_img = iplane->data + (by >> iplane->ydec)*iplane->ystride
-       + (bx >> iplane->xdec);
-      od_mc_predict1fmv8_c(state->mc_buf[4], ref_img, iplane->ystride,
-       mvx0 << (3 - iplane->xdec), mvy0 << (3 - iplane->ydec),
-       log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane->xdec,
-       log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane->ydec);
-      /*Then, calculate SAD between a target block and the subpel interpolated
-         MC block.*/
-      ret += od_enc_sad8(est->enc, state->mc_buf[4],
-       1 << (log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane->xdec),
-       1, pli, bx, by, log_mvb_sz + OD_LOG_MVBSIZE_MIN) >> OD_MC_CHROMA_SCALE;
+      /*For ref0.*/
+      ref_img = iplane0->data + (by >> iplane0->ydec)*iplane0->ystride
+       + (bx >> iplane0->xdec);
+      od_mc_predict1fmv8_c(state->mc_buf[0], ref_img, iplane0->ystride,
+       mvx0 << (3 - iplane0->xdec), mvy0 << (3 - iplane0->ydec),
+       log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane0->xdec,
+       log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane0->ydec);
+      /*For ref1.*/
+      ref_img = iplane1->data + (by >> iplane1->ydec)*iplane1->ystride
+       + (bx >> iplane1->xdec);
+      od_mc_predict1fmv8_c(state->mc_buf[1], ref_img, iplane1->ystride,
+       mvx1 << (3 - iplane1->xdec), mvy1 << (3 - iplane1->ydec),
+       log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane1->xdec,
+       log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane1->ydec);
+      ref0 = state->mc_buf[0];
+      ref1 = state->mc_buf[1];
+      w = 1 << (log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane0->xdec);
+      h = 1 << (log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane0->ydec);
+      for (y=0; y<h; y++) {
+        for (x=0; x<w; x++) {
+          ref0_pel = *(ref0 + y*iplane0->ystride + x);
+          ref1_pel = *(ref1 + y*iplane1->ystride + x);
+          blended_blk[y*w + x] = (ref0_pel + ref1_pel + 1) >> 1;
+        }
+      }
+      /*Then, calculate SAD between a target block and
+         the blended subpel-interpolated MC blocks.*/
+      ret += od_enc_sad8(est->enc, blended_blk, w, 1, pli,
+       bx, by, log_mvb_sz + OD_LOG_MVBSIZE_MIN) >> OD_MC_CHROMA_SCALE;
     }
   }
   return ret;
