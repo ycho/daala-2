@@ -2263,7 +2263,8 @@ static int32_t od_mv_est_bma_sad8(od_mv_est_ctx *est,
          subpel position for BMA search is interpolated at block level.*/
       ref_img = iplane->data + (by >> iplane->ydec)*iplane->ystride
        + (bx >> iplane->xdec);
-      od_mc_predict1fmv8_c(state->mc_buf[4], ref_img, iplane->ystride,
+      (*state->opt_vtbl.mc_predict1fmv8)(state->mc_buf[4], ref_img,
+       iplane->ystride,
        mvx << (3 - iplane->xdec), mvy << (3 - iplane->ydec),
        log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane->xdec,
        log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane->ydec);
@@ -2310,7 +2311,6 @@ static int32_t od_mv_est_bipred_bma_sad8(od_mv_est_ctx *est,
   dy0 = by + mvy0;
   dx1 = bx + mvx1;
   dy1 = by + mvy1;
-  /*TODO: Modify od_enc_sad8() which get SAD from bidirectionally blending.*/
   /*Create blended ref image from two bi-directionally predicted images.*/
   ref0 = iplane0->data + dy0 *iplane0->ystride + dx0;
   ref1 = iplane1->data + dy1 *iplane1->ystride + dx1;
@@ -2341,14 +2341,16 @@ static int32_t od_mv_est_bipred_bma_sad8(od_mv_est_ctx *est,
       /*For ref0.*/
       ref_img = iplane0->data + (by >> iplane0->ydec)*iplane0->ystride
        + (bx >> iplane0->xdec);
-      od_mc_predict1fmv8_c(state->mc_buf[0], ref_img, iplane0->ystride,
+      (*state->opt_vtbl.mc_predict1fmv8)(state->mc_buf[0], ref_img,
+       iplane0->ystride,
        mvx0 << (3 - iplane0->xdec), mvy0 << (3 - iplane0->ydec),
        log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane0->xdec,
        log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane0->ydec);
       /*For ref1.*/
       ref_img = iplane1->data + (by >> iplane1->ydec)*iplane1->ystride
        + (bx >> iplane1->xdec);
-      od_mc_predict1fmv8_c(state->mc_buf[1], ref_img, iplane1->ystride,
+      (*state->opt_vtbl.mc_predict1fmv8)(state->mc_buf[1], ref_img,
+       iplane1->ystride,
        mvx1 << (3 - iplane1->xdec), mvy1 << (3 - iplane1->ydec),
        log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane1->xdec,
        log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane1->ydec);
