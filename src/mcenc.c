@@ -2922,31 +2922,51 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
 #endif
   /*previous_cost is our previous best cost from a previous pass of phase 1.*/
   previous_cost = (mv->bma_sad << OD_ERROR_SCALE) + mv->mv_rate*est->lambda;
-#if OD_NUM_B_FRAMES
-  /*Current frame is B and its 2nd (i.e. backward) prediction?*/
-  if (state->frame_type == OD_B_FRAME && ref == OD_FRAME_NEXT) {
-  /*Try bi-directional blended MC here then choose the best mode.*/
-    int32_t sad;
-    int32_t cost;
-    int rate;
-    /*Forward MV.*/
-    int mvx0;
-    int mvy0;
-    /*Backward MV.*/
-    int mvx1 = best_vec[0];
-    int mvy1 = best_vec[1];
-    mvx0 = mv->bma_mvs[0][OD_FRAME_PREV][0];
-    mvy0 = mv->bma_mvs[0][OD_FRAME_PREV][1];
-    mvx1 = best_vec[0];
-    mvy1 = best_vec[1];
-    /*Block matching with Bidirectional prediction.*/
-    sad = od_mv_est_bipred_bma_sad8(est, ref, bx, by,
-     mvx0, mvy0, mvx1, mvy1, log_mvb_sz);
-    /*rate = od_mv_est_bits(est, equal_mvs,
-     candx << 1, candy << 1, pred[0], pred[1], ref, ref_pred);
-    cost = (sad << OD_ERROR_SCALE) + rate*est->lambda;*/
+  if (OD_NUM_B_FRAMES)
+  {
+    /*Current frame is B and its 2nd (i.e. backward) prediction?*/
+    if (state->frame_type == OD_B_FRAME && ref == OD_FRAME_NEXT) {
+    /*Do bi-directional blended MC here then
+       compare it with forward predicted MC.*/
+      int32_t sad;
+      int32_t cost;
+      int rate0;
+      int rate1;
+      /*Forward MV.*/
+      int mvx0;
+      int mvy0;
+      /*Backward MV.*/
+      int mvx1;
+      int mvy1;
+      mvx0 = mv->bma_mvs[0][OD_FRAME_PREV][0];
+      mvy0 = mv->bma_mvs[0][OD_FRAME_PREV][1];
+      mvx1 = best_vec[0];
+      mvy1 = best_vec[1];
+      /*Block matching with Bidirectional prediction.*/
+      sad = od_mv_est_bipred_bma_sad8(est, ref, bx, by,
+       mvx0, mvy0, mvx1, mvy1, log_mvb_sz);
+      rate0 = od_mv_est_bits(est, equal_mvs,
+       mvx0 << 1, mvy0 << 1, pred[0], pred[1], ref, ref_pred);
+      rate1 = od_mv_est_bits(est, equal_mvs,
+       mvx1 << 1, mvy1 << 1, pred[0], pred[1], ref, ref_pred);
+      cost = (sad << OD_ERROR_SCALE) + (rate0 + rate1)*est->lambda;
+      /*Compare bidir and forward predictions.*/
+      if (cost < previous_cost) {
+        mv->bma_mvs[0][OD_FRAME_NEXT][0] = mvx1;
+        mv->bma_mvs[0][OD_FRAME_NEXT][1] = mvy1;
+        mvg->mv[0] = mvx0 << 3;
+        mvg->mv[1] = mvy0 << 3;
+        mvg->mv1[0] = mvx1 << 3;
+        mvg->mv1[1] = mvy1 << 3;
+        mvg->ref = 2;
+        mvg->valid = 1;
+        mv->bma_sad = sad;
+        mv->mv_rate = rate0 + rate1;
+        /*Now, the previous_cost is from bidir-pred.*/
+        previous_cost = (sad << OD_ERROR_SCALE) + (rate0 + rate1)*est->lambda;
+      }
+    }
   }
-#endif
   if (must_update || (best_cost < previous_cost)) {
     OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
      "Found a better SAD then previous best."));
