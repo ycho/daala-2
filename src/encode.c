@@ -1512,10 +1512,10 @@ static void od_predict_frame(daala_enc_ctx *enc) {
   od_state_mc_predict(&enc->state);
   /*Do edge extension here because the block-size analysis needs to read
     outside the frame, but otherwise isn't read from.*/
-  od_img_edge_ext(enc->state.out_imgs + OD_FRAME_REC);
+  od_img_edge_ext(enc->state.out_imgs + enc->state.curr_dec_frame);
 #if defined(OD_DUMP_IMAGES)
   /*Dump reconstructed frame.*/
-  /*od_state_dump_img(&enc->state,enc->state.out_imgs + OD_FRAME_REC,"rec");*/
+  /*od_state_dump_img(&enc->state,enc->state.out_imgs + enc->state.curr_dec_frame,"rec");*/
   od_state_fill_vis(&enc->state);
   od_state_dump_img(&enc->state, &enc->state.vis_img, "vis");
 #endif
@@ -1548,10 +1548,10 @@ static void od_split_superblocks(daala_enc_ctx *enc, int is_keyframe) {
     bstride = state->bstride;
     istride = state->in_imgs[state->curr_frame].planes[0].ystride;
     rstride = is_keyframe ? 0 :
-     state->out_imgs[OD_FRAME_REC].planes[0].ystride;
+     state->out_imgs[state->curr_dec_frame].planes[0].ystride;
     bimg = state->in_imgs[state->curr_frame].planes[0].data
      + i*istride*OD_BSIZE_MAX;
-    rimg = state->out_imgs[OD_FRAME_REC].planes[0].data
+    rimg = state->out_imgs[state->curr_dec_frame].planes[0].data
      + i*rstride*OD_BSIZE_MAX;
     for (j = 0; j < nhsb; j++) {
       int bsize[4][4];
@@ -1594,7 +1594,7 @@ static void od_encode_mvs(daala_enc_ctx *enc, int num_refs) {
   uint16_t *cdf;
   nhmvbs = enc->state.nhmvbs;
   nvmvbs = enc->state.nvmvbs;
-  mvimg = enc->state.out_imgs + OD_FRAME_REC;
+  mvimg = enc->state.out_imgs + enc->state.curr_dec_frame;
   mv_res = enc->state.mv_res;
   OD_ASSERT(0 <= mv_res && mv_res < 3);
   od_ec_enc_uint(&enc->ec, mv_res, 3);
@@ -1714,7 +1714,7 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
       int coeff_shift;
       coeff_shift = enc->quantizer[pli] == 0 ? 0 : OD_COEFF_SHIFT;
       data = state->in_imgs[state->curr_frame].planes[pli].data;
-      mdata = state->out_imgs[OD_FRAME_REC].planes[pli].data;
+      mdata = state->out_imgs[state->curr_dec_frame].planes[pli].data;
       ystride = state->in_imgs[state->curr_frame].planes[pli].ystride;
       for (y = 0; y < h; y++) {
         for (x = 0; x < w; x++) {
@@ -1807,7 +1807,7 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
       w = frame_width >> xdec;
       h = frame_height >> ydec;
       coeff_shift = enc->quantizer[pli] == 0 ? 0 : OD_COEFF_SHIFT;
-      data = state->out_imgs[OD_FRAME_REC].planes[pli].data;
+      data = state->out_imgs[state->curr_dec_frame].planes[pli].data;
       ystride = state->in_imgs[state->curr_frame].planes[pli].ystride;
       for (y = 0; y < h; y++) {
         for (x = 0; x < w; x++) {
@@ -1816,7 +1816,7 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
         }
       }
     }
-    od_state_dump_img(&enc->state, enc->state.out_imgs + OD_FRAME_REC,
+    od_state_dump_img(&enc->state, enc->state.out_imgs + enc->state.curr_dec_frame,
      "lapped");
   }
 #endif
@@ -1945,7 +1945,7 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
       int ystride;
       int coeff_shift;
       coeff_shift = enc->quantizer[pli] == 0 ? 0 : OD_COEFF_SHIFT;
-      data = state->out_imgs[OD_FRAME_REC].planes[pli].data;
+      data = state->out_imgs[state->curr_dec_frame].planes[pli].data;
       ystride = state->in_imgs[state->curr_frame].planes[pli].ystride;
       for (y = 0; y < h; y++) {
         for (x = 0; x < w; x++) {
@@ -1988,8 +1988,8 @@ static void od_dump_frame_metrics(od_state *state) {
     for (y = 0; y < h; y++) {
       unsigned char *rec_row;
       unsigned char *inp_row;
-      rec_row = state->out_imgs[OD_FRAME_REC].planes[pli].data +
-       state->out_imgs[OD_FRAME_REC].planes[pli].ystride*y;
+      rec_row = state->out_imgs[state->curr_dec_frame].planes[pli].data +
+       state->out_imgs[state->curr_dec_frame].planes[pli].ystride*y;
       inp_row = data + ystride*y;
       for (x = 0; x < w; x++) {
         int inp_val;
@@ -2382,7 +2382,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
 
   if (OD_NUM_B_FRAMES == 0 || frame_type != OD_B_FRAME)
   {
-    /*Copy full-pel ref image from state.out_imgs[OD_FRAME_REC]
+    /*Copy full-pel ref image from state.out_imgs[state->curr_dec_frame]
        to state.ref_imgs[].*/
     ref_img = enc->state.ref_imgs + enc->state.ref_imgi[OD_FRAME_SELF];
     OD_ASSERT(ref_img);
@@ -2519,7 +2519,7 @@ int daala_encode_packet_out(daala_enc_ctx *enc, int last, ogg_packet *op) {
 
 #if defined(OD_ENCODER_CHECK)
   /*Compare reconstructed frame against decoded frame.*/
-  daala_encoder_check(enc, enc->state.out_imgs + OD_FRAME_REC, op);
+  daala_encoder_check(enc, enc->state.out_imgs + enc->state.curr_dec_frame, op);
 #endif
 
   return 1;

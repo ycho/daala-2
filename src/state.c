@@ -587,7 +587,7 @@ void od_state_set_mv_res(od_state *state, int mv_res) {
   TODO: Pipeline with reconstruction.*/
 void od_state_upsample8(od_state *state, int refi) {
   int pli;
-  for (pli = 0; pli < state->out_imgs[OD_FRAME_REC].nplanes; pli++) {
+  for (pli = 0; pli < state->out_imgs[state->curr_dec_frame].nplanes; pli++) {
     od_img_plane *siplane;
     od_img_plane *diplane;
     unsigned char *src;
@@ -598,12 +598,12 @@ void od_state_upsample8(od_state *state, int refi) {
     int h;
     int x;
     int y;
-    siplane = state->out_imgs[OD_FRAME_REC].planes + pli;
+    siplane = state->out_imgs[state->curr_dec_frame].planes + pli;
     diplane = state->ref_imgs[refi].planes + pli;
     xpad = OD_UMV_PADDING >> siplane->xdec;
     ypad = OD_UMV_PADDING >> siplane->ydec;
-    w = state->out_imgs[OD_FRAME_REC].width >> siplane->xdec;
-    h = state->out_imgs[OD_FRAME_REC].height >> siplane->ydec;
+    w = state->out_imgs[state->curr_dec_frame].width >> siplane->xdec;
+    h = state->out_imgs[state->curr_dec_frame].height >> siplane->ydec;
     src = siplane->data;
     dst = diplane->data - (diplane->ystride << 1)*ypad;
     for (y = -ypad; y < h + ypad + 2; y++) {
@@ -703,7 +703,7 @@ void od_state_upsample8(od_state *state, int refi) {
   TODO: Pipeline with reconstruction.*/
 void od_state_upsample8(od_state *state, od_img *dimg, const od_img *simg) {
   int pli;
-  for (pli = 0; pli < state->out_imgs[OD_FRAME_REC].nplanes; pli++) {
+  for (pli = 0; pli < state->out_imgs[state->curr_dec_frame].nplanes; pli++) {
     const od_img_plane *siplane;
     od_img_plane *diplane;
     const unsigned char *src;
@@ -1225,7 +1225,7 @@ void od_state_fill_vis(od_state *state) {
     img->planes[pli].data += (border >> img->planes[pli].xdec)
      + img->planes[pli].ystride*(border >> img->planes[pli].ydec);
   }
-  od_state_upsample8(state, img, state->out_imgs + OD_FRAME_REC);
+  od_state_upsample8(state, img, state->out_imgs + state->curr_dec_frame);
   /*Upsample the input image, as well, and subtract it to get a difference
      image.*/
   ref_img = &state->tmp_vis_img;
@@ -1404,7 +1404,7 @@ void od_state_mc_predict(od_state *state) {
   int vy;
   nhmvbs = state->nhmvbs;
   nvmvbs = state->nvmvbs;
-  img = state->out_imgs + OD_FRAME_REC;
+  img = state->out_imgs + state->curr_dec_frame;
   for (vy = 0; vy < nvmvbs; vy += OD_MVB_DELTA0) {
     for (vx = 0; vx < nhmvbs; vx += OD_MVB_DELTA0) {
       for (pli = 0; pli < img->nplanes; pli++) {
