@@ -179,7 +179,7 @@ struct od_state{
   od_img              ref_imgs[4];
   /** Pointer to input and output image. */
   od_img              in_imgs[1 + OD_NUM_B_FRAMES];
-  od_img              out_imgs[1];
+  od_img              out_imgs[1 + OD_NUM_B_FRAMES];
   /* ----------------------------------------------------- */
   /** I,P,B frame type of current frame. */
   int                 frame_type;
@@ -193,10 +193,18 @@ struct od_state{
   int           in_buff_ptr;
   /** Head pointer of in_imgs[]. */
   int           in_buff_head;
+  /** Tail pointer of out_imgs[]. */
+  int           out_buff_ptr;
+  /** Head pointer of out_imgs[]. */
+  int           out_buff_head;
   /** Current input frame pointer of in_imgs[]. */
   int           curr_frame;
+  /** Current output frame pointer of out_imgs[]. */
+  int           curr_dec_frame;
   /** # of frames left in buffer to encode. */
   int           frames_in_buff;
+  /** # of frames left in output buffer to display. */
+  int           frames_in_out_buff;
   /* ----------------------------------------------------- */
   unsigned char *ref_line_buf[8];
   unsigned char *ref_img_data;

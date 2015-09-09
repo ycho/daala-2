@@ -2099,6 +2099,38 @@ static void od_update_buff(od_state *state)
    in_buff_ptr < state->frame_delay);
 }
 
+/*Add a decoded frame at the tail of a output buffer.*/
+/*Note: Call this function to get output buffer pointer.*/
+static int od_add_out_buff(od_state *state)
+{
+  int tail;
+  tail = state->out_buff_ptr;
+  /*Update the head of in_buff[].*/
+  state->out_buff_ptr = (tail + 1 + state->frame_delay) % state->frame_delay;
+  state->frames_in_out_buff += 1;
+  return state->out_buff_ptr;
+}
+
+static int od_get_out_buff_head(od_state *state)
+{
+  int head;
+  head = state->out_buff_head;
+  /*Update the head of out_buff[].*/
+  state->out_buff_ptr = (head + 1) % state->frame_delay;
+  state->frames_in_out_buff -= 1;
+  return head;
+}
+
+static int od_get_out_buff_tail(od_state *state)
+{
+  int tail;
+  tail = state->out_buff_ptr;
+  /*Update the head of in_buff[].*/
+  state->out_buff_ptr = (tail - 1 + state->frame_delay) % state->frame_delay;
+  state->frames_in_out_buff -= 1;
+  return tail;
+}
+
 /*Assume encoding order, I0 P1 B2 B3 P4 B5 B6 P7 ..., if # of B frames = 2.*/
 /*Note: Must be called once and only once before encoding each frame.*/
 /*Known issue: If P or I is the last frame and if the # of last B frames
@@ -2255,6 +2287,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
     mbctx.is_keyframe = 1;
     frame_type = OD_I_FRAME;
   }
+  enc->state.curr_dec_frame = od_add_out_buff(&enc->state);
   mbctx.frame_type = frame_type;
   enc->state.frame_type = frame_type;
   /*Only P frame can use golden reference frame.*/
@@ -2345,26 +2378,37 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   if (enc->complexity >= 2) od_split_superblocks_rdo(enc, &mbctx);
   else od_split_superblocks(enc, mbctx.is_keyframe);
   od_encode_coefficients(enc, &mbctx, OD_ENCODE_REAL);
-#if defined(OD_DUMP_IMAGES) || defined(OD_DUMP_RECONS)
-  /*Dump YUV*/
-  od_state_dump_yuv(&enc->state, enc->state.out_imgs + OD_FRAME_REC, "out");
-#endif
+  enc->packet_state = OD_PACKET_READY;
+
+  if (OD_NUM_B_FRAMES == 0 || frame_type != OD_B_FRAME)
+  {
+    /*Copy full-pel ref image from state.out_imgs[OD_FRAME_REC]
+       to state.ref_imgs[].*/
+    ref_img = enc->state.ref_imgs + enc->state.ref_imgi[OD_FRAME_SELF];
+    OD_ASSERT(ref_img);
+    od_img_copy(ref_img, enc->state.out_imgs + enc->state.curr_dec_frame);
+    od_img_edge_ext(ref_img);
+  }
 #if defined(OD_LOGGING_ENABLED)
   od_dump_frame_metrics(&enc->state);
 #endif
-  enc->packet_state = OD_PACKET_READY;
-  /*Copy full-pel ref image from state.out_imgs[OD_FRAME_REC]
-     to state.ref_imgs[].*/
-  ref_img = enc->state.ref_imgs + enc->state.ref_imgi[OD_FRAME_SELF];
-  OD_ASSERT(ref_img);
-  od_img_copy(ref_img, enc->state.out_imgs + OD_FRAME_REC);
-  od_img_edge_ext(ref_img);
+#if defined(OD_DUMP_IMAGES) || defined(OD_DUMP_RECONS)
+  /*Dump YUV*/
+  if (OD_NUM_B_FRAMES == 0 || frame_type == OD_B_FRAME ||
+   (frame_type == OD_P_FRAME && enc->state.frames_in_out_buff >= 2) ||
+   (frame_type == OD_I_FRAME && enc->state.frames_in_out_buff >= 2) ||
+   enc->state.frames_in_out_buff == 1) {
+    int tail;
+    tail = od_get_out_buff_tail(&enc->state);
+    od_state_dump_yuv(&enc->state, enc->state.out_imgs + tail, "out");
+  }
+#endif
   /*Update the reference buffer state.*/
   if (mbctx.is_golden_frame) {
     enc->state.ref_imgi[OD_FRAME_GOLD] =
      enc->state.ref_imgi[OD_FRAME_SELF];
   }
-  /*B frames cannot be set as reference frames.*/
+  /*B frames cannot be a reference frame.*/
   if (OD_NUM_B_FRAMES == 0) {
     enc->state.ref_imgi[OD_FRAME_PREV] =
      enc->state.ref_imgi[OD_FRAME_SELF];

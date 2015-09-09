@@ -314,9 +314,10 @@ static int od_state_init_impl(od_state *state, const daala_info *info) {
   state->nhmvbs = state->frame_width >> OD_LOG_MVBSIZE_MIN;
   state->nvmvbs = state->frame_height >> OD_LOG_MVBSIZE_MIN;
   od_state_opt_vtbl_init(state);
-    /*If B frames are used, we need additional frame buffers (for encoder only).*/
-    num_in_frames = state->codec_mode ? 0 : 1 + OD_NUM_B_FRAMES;
-  if (OD_UNLIKELY(od_state_ref_imgs_init(state, 4, num_in_frames, 1))) {
+  /*If B frames are used, we need additional frame buffers (for encoder only).*/
+  num_in_frames = state->codec_mode ? 0 : 1 + OD_NUM_B_FRAMES;
+  if (OD_UNLIKELY(od_state_ref_imgs_init(state, 4, num_in_frames,
+   1 + OD_NUM_B_FRAMES))) {
     return OD_EFAULT;
   }
   if (OD_UNLIKELY(od_state_mvs_init(state))) {
@@ -397,8 +398,11 @@ static int od_state_init_impl(od_state *state, const daala_info *info) {
   state->frame_delay = OD_NUM_B_FRAMES + 1;
   state->in_buff_ptr = 0;
   state->in_buff_head = 0;
+  state->out_buff_ptr = 0;
+  state->out_buff_head = 0;
   state->curr_frame = 0;
   state->frames_in_buff = 0;
+  state->frames_in_out_buff = 0;
   state->enc_order_count = 0;
   state->display_order_count = 0;
   return OD_SUCCESS;
