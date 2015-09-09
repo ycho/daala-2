@@ -2081,15 +2081,15 @@ static int od_get_buff_head(od_state *state)
 static int od_get_buff_tail(od_state *state)
 {
   int tail;
-  tail = (state->in_buff_ptr - 1 + state->frame_delay) % state->frame_delay;
-  /*Update the head of in_buff[].*/
+  tail = state->in_buff_ptr;
+  /*Update the tail of in_buff[].*/
   state->in_buff_ptr = (tail - 1 + state->frame_delay) % state->frame_delay;
   state->frames_in_buff -= 1;
   return tail;
 }
 
 /*Update all buffer pointers related to state->in_imgs[].*/
-static void od_update_buff(od_state *state)
+static void od_add_in_buff(od_state *state, od_img *img)
 {
   /*Increase # of input frames in in_imgs[] for encoding.*/
   state->frames_in_buff += 1;
@@ -2097,6 +2097,8 @@ static void od_update_buff(od_state *state)
   state->in_buff_ptr = (state->in_buff_ptr + 1) % state->frame_delay;
   OD_ASSERT(in_buff_ptr >= 0 &&
    in_buff_ptr < state->frame_delay);
+
+  od_img_copy_pad(state, img);
 }
 
 /*Add a decoded frame at the tail of a output buffer.*/
@@ -2105,7 +2107,7 @@ static int od_add_out_buff(od_state *state)
 {
   int tail;
   tail = state->out_buff_ptr;
-  /*Update the head of in_buff[].*/
+  /*Update the tail of in_buff[].*/
   state->out_buff_ptr = (tail + 1 + state->frame_delay) % state->frame_delay;
   state->frames_in_out_buff += 1;
   return state->out_buff_ptr;
@@ -2125,7 +2127,7 @@ static int od_get_out_buff_tail(od_state *state)
 {
   int tail;
   tail = state->out_buff_ptr;
-  /*Update the head of in_buff[].*/
+  /*Update the tail of in_buff[].*/
   state->out_buff_ptr = (tail - 1 + state->frame_delay) % state->frame_delay;
   state->frames_in_out_buff -= 1;
   return tail;
@@ -2215,13 +2217,12 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   if (OD_NUM_B_FRAMES == 0 ||
    (!last_in_frame && enc->state.frames_in_buff < enc->state.frame_delay))
   {
-    od_img_copy_pad(&enc->state, img);
+    od_add_in_buff(&enc->state, img);
   #if defined(OD_DUMP_IMAGES)
     if (od_logging_active(OD_LOG_GENERIC, OD_LOG_DEBUG)) {
       od_img_dump_padded(&enc->state);
     }
   #endif
-      od_update_buff(&enc->state);
   }
   /*If buffer is not filled as required, don't proceed to encoding.*/
   if (!last_in_frame && enc->state.frames_in_buff < enc->state.frame_delay)
