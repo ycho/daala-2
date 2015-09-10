@@ -1047,12 +1047,21 @@ static void od_decode_coefficients(od_dec_ctx *dec, od_mb_dec_ctx *mbctx) {
   }
 }
 
+int daala_decoder_output_frame_ready(daala_dec_ctx *dec)
+{
+  if (dec == NULL)
+    return 0;
+  if (dec->state.curr_dec_output >= 0)
+    return 1;
+}
+
 int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
  const ogg_packet *op) {
   int refi;
   od_mb_dec_ctx mbctx;
   od_img *ref_img;
   int frame_type;
+  dec->state.curr_dec_output = -1;
   if (dec == NULL || img == NULL || op == NULL) return OD_EFAULT;
   if (dec->packet_state != OD_PACKET_DATA) return OD_EINVAL;
   if (op->e_o_s)
@@ -1070,12 +1079,12 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
   if (od_ec_decode_bool_q15(&dec->ec, 16384, "flags")) return OD_EBADPACKET;
   dec->state.curr_dec_frame = od_add_to_output_buff(&dec->state);
   mbctx.is_keyframe = od_ec_decode_bool_q15(&dec->ec, 16384, "flags");
-  if (!mbctx.is_keyframe) {
-    frame_type = OD_I_FRAME;
-  }
+  if (mbctx.is_keyframe) frame_type = OD_I_FRAME;
   else {
     frame_type = OD_P_FRAME + od_ec_decode_bool_q15(&dec->ec, 16384, "flags");
   }
+  printf("frame# : enc order %06ld : frame type %d\n",
+   dec->state.enc_order_count, frame_type);
   if (frame_type == OD_P_FRAME) {
     mbctx.num_refs = od_ec_dec_uint(&dec->ec, OD_MAX_CODED_REFS, "flags") + 1;
   } else {
@@ -1144,18 +1153,6 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
        &dec->state.bsize[dec->state.bstride*j], nhsb*4);
     }
   }
-#if defined(OD_DUMP_IMAGES) || defined(OD_DUMP_RECONS)
-  /*Dump YUV*/
-  od_state_dump_yuv(&dec->state, dec->state.out_imgs + dec->state.curr_dec_frame, "out");
-  if (OD_NUM_B_FRAMES == 0 || frame_type == OD_B_FRAME ||
-   (frame_type == OD_P_FRAME && dec->state.frames_in_out_buff >= 2) ||
-   (frame_type == OD_I_FRAME && dec->state.frames_in_out_buff >= 2) ||
-   dec->state.frames_in_out_buff == 1) {
-    int tail;
-    tail = od_get_output_buff_tail(&dec->state);
-    od_state_dump_yuv(&dec->state, dec->state.out_imgs + tail, "out");
-  }
-#endif
   if (OD_NUM_B_FRAMES == 0 || frame_type != OD_B_FRAME)
   {
     ref_img = dec->state.ref_imgs + dec->state.ref_imgi[OD_FRAME_SELF];
@@ -1163,11 +1160,30 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
     od_img_copy(ref_img, dec->state.out_imgs + dec->state.curr_dec_frame);
     od_img_edge_ext(ref_img);
   }
-  /*Return decoded frame.*/
-  *img = dec->state.out_imgs[dec->state.curr_dec_frame];
-  img->width = dec->state.info.pic_width;
-  img->height = dec->state.info.pic_height;
-  dec->state.cur_time++;
+  /*Determine output frame in output buffer.*/
+  if (OD_NUM_B_FRAMES == 0 || frame_type == OD_B_FRAME ||
+      (frame_type == OD_I_FRAME && dec->state.enc_order_count == 0)) {
+    dec->state.curr_dec_output = od_get_output_buff_tail(&dec->state);
+    dec->state.out_imgs_id[dec->state.curr_dec_output] = -1;
+  }
+  if ((frame_type == OD_P_FRAME || frame_type == OD_I_FRAME) &&
+   dec->state.frames_in_out_buff == 2) {
+    dec->state.curr_dec_output = od_get_output_buff_head(&dec->state);
+    dec->state.out_imgs_id[dec->state.curr_dec_output] = -1;
+  }
+#if defined(OD_DUMP_IMAGES) || defined(OD_DUMP_RECONS)
+  /*Dump YUV*/
+  od_state_dump_yuv(&dec->state,
+   dec->state.out_imgs + dec->state.curr_dec_output, "out");
+#endif
+  if (dec->state.curr_dec_output >= 0)
+  {
+    /*Return decoded frame.*/
+    *img = dec->state.out_imgs[dec->state.curr_dec_output];
+    img->width = dec->state.info.pic_width;
+    img->height = dec->state.info.pic_height;
+    dec->state.cur_time++;
+  }
   if (mbctx.is_golden_frame) {
     dec->state.ref_imgi[OD_FRAME_GOLD] =
      dec->state.ref_imgi[OD_FRAME_SELF];
@@ -1197,5 +1213,6 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
       }
     }
   }
+  ++dec->state.enc_order_count;
   return 0;
 }

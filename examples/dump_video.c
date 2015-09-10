@@ -123,6 +123,7 @@ static void video_write(void) {
           fprintf(stderr, "Error writing yuv frame");
           return;
         }
+        fflush(outfile);
       }
     }
   }
@@ -413,8 +414,7 @@ int main(int argc, char *argv[]) {
         queue_page(&og);
       }
     }
-    /* dumpvideo frame, and get new one */
-    else if (outfile) video_write();
+    else if (outfile && daala_decoder_output_frame_ready(dd)) video_write();
     videobuf_ready = 0;
   }
   /* end of decoder loop -- close everything */

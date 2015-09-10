@@ -201,8 +201,10 @@ struct od_state{
   int           out_buff_head;
   /** Current input frame pointer of in_imgs[]. */
   int           curr_frame;
-  /** Current output frame pointer of out_imgs[]. */
+  /** Current decoded frame pointer of out_imgs[]. */
   int           curr_dec_frame;
+  /** Current output frame pointer of out_imgs[]. */
+  int           curr_dec_output;
   /** # of frames left in buffer to encode. */
   int           frames_in_buff;
   /** # of frames left in output buffer to display. */

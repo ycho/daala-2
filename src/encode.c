@@ -2367,17 +2367,15 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
     int tail;
     tail = od_get_output_buff_tail(&enc->state);
     od_state_dump_yuv(&enc->state, enc->state.out_imgs + tail, "out");
-    printf("output frame %d\n",
-     enc->state.out_imgs_id[enc->state.curr_dec_frame]);
-    enc->state.out_imgs_id[enc->state.curr_dec_frame] = -1;
+    printf("output frame %d\n", enc->state.out_imgs_id[tail]);
+    enc->state.out_imgs_id[tail] = -1;
   }
   if ((frame_type == OD_P_FRAME || frame_type == OD_I_FRAME) &&
    enc->state.frames_in_out_buff == 2) {
     int head;
     head = od_get_output_buff_head(&enc->state);
     od_state_dump_yuv(&enc->state, enc->state.out_imgs + head, "out");
-    printf("output frame %d\n",
-     enc->state.out_imgs_id[head]);
+    printf("output frame %d\n", enc->state.out_imgs_id[head]);
     enc->state.out_imgs_id[head] = -1;
   }
 #endif

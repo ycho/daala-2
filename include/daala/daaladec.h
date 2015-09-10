@@ -188,6 +188,9 @@ void daala_decode_free(daala_dec_ctx *dec);
  * \param op An incoming Ogg packet.*/
 int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
  const ogg_packet *op);
+/**Notify whether the img returned by daala_decode_packet_in() is
+    actually has decoded image.*/
+int daala_decoder_output_frame_ready(daala_dec_ctx *dec);
 /*@}*/
 
 /** \defgroup decctlcodes Configuration keys for the decoder ctl interface.
