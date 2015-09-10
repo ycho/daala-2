@@ -184,9 +184,11 @@ struct od_state{
   /** I,P,B frame type of current frame. */
   int                 frame_type;
   /** Frame counter in encoding/decoding order. */
-  uint64_t     enc_order_count;
+  int64_t     enc_order_count;
   /** Frame counter in displaying order. */
-  uint64_t     display_order_count;
+  int64_t     display_order_count;
+  /** Displaying order of current frame being encoded. */
+  int64_t     curr_display_order;
   /** Frame delay. */
   int           frame_delay;
   /** Tail pointer of in_imgs[]. */
@@ -195,6 +197,8 @@ struct od_state{
   int           in_buff_head;
   /** Tail pointer of out_imgs[]. */
   int           out_buff_ptr;
+  /** Head pointer of out_imgs[]. */
+  int           out_buff_head;
   /** Current input frame pointer of in_imgs[]. */
   int           curr_frame;
   /** Current output frame pointer of out_imgs[]. */
@@ -203,6 +207,9 @@ struct od_state{
   int           frames_in_buff;
   /** # of frames left in output buffer to display. */
   int           frames_in_out_buff;
+  /** Keep the display order of frames in input and output image buffers. */
+  int           in_imgs_id[1 + OD_NUM_B_FRAMES];
+  int           out_imgs_id[1 + OD_NUM_B_FRAMES];
   /* ----------------------------------------------------- */
   unsigned char *ref_line_buf[8];
   unsigned char *ref_img_data;

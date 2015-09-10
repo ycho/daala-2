@@ -2076,6 +2076,7 @@ static int od_get_input_buff_head(od_state *state)
   /*Update the head of in_buff[].*/
   state->in_buff_head = (head + 1) % state->frame_delay;
   state->frames_in_buff -= 1;
+  printf("head at input_buff = %d\n", state->in_imgs_id[head]);
   return head;
 }
 
@@ -2087,6 +2088,7 @@ static int od_get_input_buff_tail(od_state *state)
   /*Update the tail of in_buff[].*/
   state->in_buff_ptr = (tail - 1 + state->frame_delay) % state->frame_delay;
   state->frames_in_buff -= 1;
+  printf("tail at input_buff = %d\n", state->in_imgs_id[tail]);
   return tail;
 }
 
@@ -2099,7 +2101,10 @@ static void od_add_to_input_buff(od_state *state, od_img *img)
   state->in_buff_ptr = (state->in_buff_ptr + 1) % state->frame_delay;
   OD_ASSERT(in_buff_ptr >= 0 &&
    in_buff_ptr < state->frame_delay);
-
+  state->display_order_count += 1;
+  state->in_imgs_id[state->in_buff_ptr] = state->display_order_count;
+  if (state->frames_in_buff == 1)
+    state->in_buff_head = state->in_buff_ptr;
   od_img_copy_pad(state, img);
 }
 
@@ -2113,10 +2118,9 @@ static int determine_frame_type(od_state *state)
   int frame_type;
   int idx_in_GOP;
   int idx_in_PBB;
-  static int prev_frame_type = -1;
   idx_in_GOP = state->enc_order_count % state->info.keyframe_rate;
   /* Not a 1st frame?*/
-  if (state->enc_order_count)
+  if (state->enc_order_count != 0)
   {
     idx_in_PBB = (idx_in_GOP - 1)% (OD_NUM_B_FRAMES + 1);
     /*If open GOP with B frames > 0, encoding order and display order of
@@ -2131,29 +2135,11 @@ static int determine_frame_type(od_state *state)
       frame_type = OD_P_FRAME;
     else
       frame_type = OD_B_FRAME;
-    /*Update display order, or POC (Picture Order Counter).*/
-    if (OD_CLOSED_GOP && frame_type == OD_I_FRAME)
-      state->display_order_count = state->enc_order_count;
-    else if ((!OD_CLOSED_GOP && frame_type == OD_I_FRAME) ||
-          frame_type == OD_P_FRAME)
-      state->display_order_count = state->enc_order_count + OD_NUM_B_FRAMES;
-    else
-    {
-      if (prev_frame_type == OD_P_FRAME ||
-       (!OD_CLOSED_GOP && prev_frame_type == OD_I_FRAME))
-        state->display_order_count = state->enc_order_count - 1;
-      else
-        state->display_order_count = state->display_order_count + 1;
-    }
   }
   else
   { /*1st frame.*/
     frame_type = OD_I_FRAME;
-    state->display_order_count = 0;
   }
-  prev_frame_type = frame_type;
-  printf("frame# : enc order %06ld, display order %06ld, (frame idx in GOP %03d) : frame type %d\n",
-   state->enc_order_count, state->display_order_count, idx_in_GOP, frame_type);
   return frame_type;
 }
 
@@ -2225,6 +2211,11 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
     else
       enc->state.curr_frame = od_get_input_buff_head(&enc->state);
   }
+  else enc->state.curr_frame = 0;
+  enc->state.curr_display_order = enc->state.in_imgs_id[enc->state.curr_frame];
+  /*printf("display order = %d\n", enc->state.curr_display_order);*/
+  printf("frame# : enc order %06ld, display order %06ld : frame type %d\n",
+   enc->state.enc_order_count, enc->state.curr_display_order, frame_type);
   /* Check if the frame should be a keyframe. */
   mbctx.is_keyframe = (frame_type == OD_I_FRAME) ? 1 : 0;
   /* B-frame cannot be a Golden frame.*/
@@ -2259,6 +2250,9 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
     frame_type = OD_I_FRAME;
   }
   enc->state.curr_dec_frame = od_add_to_output_buff(&enc->state);
+  /*Let output buffer know which input frame in display order it was.*/
+  enc->state.out_imgs_id[enc->state.curr_dec_frame]
+   = enc->state.curr_display_order;
   mbctx.frame_type = frame_type;
   enc->state.frame_type = frame_type;
   /*Only P frame can use golden reference frame.*/
@@ -2369,12 +2363,22 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
 #if defined(OD_DUMP_IMAGES) || defined(OD_DUMP_RECONS)
   /*Dump YUV*/
   if (OD_NUM_B_FRAMES == 0 || frame_type == OD_B_FRAME ||
-   (frame_type == OD_P_FRAME && enc->state.frames_in_out_buff >= 2) ||
-   (frame_type == OD_I_FRAME && enc->state.frames_in_out_buff >= 2) ||
    (frame_type == OD_I_FRAME && enc->state.enc_order_count == 0)) {
     int tail;
     tail = od_get_output_buff_tail(&enc->state);
     od_state_dump_yuv(&enc->state, enc->state.out_imgs + tail, "out");
+    printf("output frame %d\n",
+     enc->state.out_imgs_id[enc->state.curr_dec_frame]);
+    enc->state.out_imgs_id[enc->state.curr_dec_frame] = -1;
+  }
+  if ((frame_type == OD_P_FRAME || frame_type == OD_I_FRAME) &&
+   enc->state.frames_in_out_buff == 2) {
+    int head;
+    head = od_get_output_buff_head(&enc->state);
+    od_state_dump_yuv(&enc->state, enc->state.out_imgs + head, "out");
+    printf("output frame %d\n",
+     enc->state.out_imgs_id[head]);
+    enc->state.out_imgs_id[head] = -1;
   }
 #endif
   /*Update the reference buffer state.*/
@@ -2433,6 +2437,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   }
   fprintf(enc->bsize_dist_file, "\n");
 #endif
+  enc->state.in_imgs_id[enc->state.curr_frame] = -1;
   ++enc->state.enc_order_count;
   return 0;
 }

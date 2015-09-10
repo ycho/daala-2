@@ -298,6 +298,7 @@ static int od_state_init_impl(od_state *state, const daala_info *info) {
   int nplanes;
   int pli;
   int num_in_frames;
+  int i;
   /*First validate the parameters.*/
   if (info == NULL) return OD_EFAULT;
   nplanes = info->nplanes;
@@ -399,11 +400,16 @@ static int od_state_init_impl(od_state *state, const daala_info *info) {
   state->in_buff_ptr = -1;
   state->in_buff_head = 0;
   state->out_buff_ptr = -1;
+  state->out_buff_head = 0;
   state->curr_frame = 0;
   state->frames_in_buff = 0;
   state->frames_in_out_buff = 0;
   state->enc_order_count = 0;
-  state->display_order_count = 0;
+  state->display_order_count = -1;
+  for (i = 0; i < 1 + OD_NUM_B_FRAMES; i++) {
+  state->in_imgs_id[i] = -1;
+  state->out_imgs_id[i] = -1;
+  }
   return OD_SUCCESS;
 }
 
@@ -1545,7 +1551,20 @@ int od_add_to_output_buff(od_state *state)
   state->out_buff_ptr = (state->out_buff_ptr + 1 + state->frame_delay) %
    state->frame_delay;
   state->frames_in_out_buff += 1;
+  if (state->frames_in_out_buff == 1)
+    state->out_buff_head = state->out_buff_ptr;
   return state->out_buff_ptr;
+}
+
+int od_get_output_buff_head(od_state *state)
+{
+  int head;
+  OD_ASSERT(state->frames_in_out_buff > 0);
+  head = state->out_buff_head;
+  /*Update the tail of in_buff[].*/
+  state->out_buff_head = (head + 1 + state->frame_delay) % state->frame_delay;
+  state->frames_in_out_buff -= 1;
+  return head;
 }
 
 int od_get_output_buff_tail(od_state *state)
