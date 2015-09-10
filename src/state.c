@@ -396,10 +396,9 @@ static int od_state_init_impl(od_state *state, const daala_info *info) {
   state->sb_q_scaling = (unsigned char *)malloc(state->nhsb * state->nvsb);
   /*Init input buffer related variables.*/
   state->frame_delay = OD_NUM_B_FRAMES + 1;
-  state->in_buff_ptr = 0;
+  state->in_buff_ptr = -1;
   state->in_buff_head = 0;
-  state->out_buff_ptr = 0;
-  state->out_buff_head = 0;
+  state->out_buff_ptr = -1;
   state->curr_frame = 0;
   state->frames_in_buff = 0;
   state->frames_in_out_buff = 0;
@@ -1535,4 +1534,27 @@ void od_img_edge_ext(od_img* src) {
      src->width >> xdec, src->height >> ydec,
      OD_UMV_PADDING >> xdec, OD_UMV_PADDING >> ydec);
   }
+}
+
+/*Add a decoded frame at the tail of a output buffer.*/
+/*Note: Call this function to get output buffer pointer.*/
+int od_add_to_output_buff(od_state *state)
+{
+  OD_ASSERT(state->frames_in_out_buff < state->frame_delay);
+  /*Increase the tail pointer.*/
+  state->out_buff_ptr = (state->out_buff_ptr + 1 + state->frame_delay) %
+   state->frame_delay;
+  state->frames_in_out_buff += 1;
+  return state->out_buff_ptr;
+}
+
+int od_get_output_buff_tail(od_state *state)
+{
+  int tail;
+  OD_ASSERT(state->frames_in_out_buff > 0);
+  tail = state->out_buff_ptr;
+  /*Update the tail of in_buff[].*/
+  state->out_buff_ptr = (tail - 1 + state->frame_delay) % state->frame_delay;
+  state->frames_in_out_buff -= 1;
+  return tail;
 }

@@ -195,8 +195,6 @@ struct od_state{
   int           in_buff_head;
   /** Tail pointer of out_imgs[]. */
   int           out_buff_ptr;
-  /** Head pointer of out_imgs[]. */
-  int           out_buff_head;
   /** Current input frame pointer of in_imgs[]. */
   int           curr_frame;
   /** Current output frame pointer of out_imgs[]. */
@@ -281,6 +279,8 @@ void od_state_init_border(od_state *_state);
 void od_state_upsample8(od_state *_state, od_img *_dst, const od_img *_src);
 int od_state_dump_yuv(od_state *_state, od_img *_img, const char *_tag);
 void od_img_edge_ext(od_img* src);
+int od_add_to_output_buff(od_state *state);
+int od_get_output_buff_tail(od_state *state);
 # if defined(OD_DUMP_IMAGES)
 int od_state_dump_img(od_state *_state, od_img *_img, const char *_tag);
 void od_img_draw_point(od_img *_img, int _x, int _y,

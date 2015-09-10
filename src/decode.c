@@ -1052,9 +1052,11 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
   int refi;
   od_mb_dec_ctx mbctx;
   od_img *ref_img;
+  int frame_type;
   if (dec == NULL || img == NULL || op == NULL) return OD_EFAULT;
   if (dec->packet_state != OD_PACKET_DATA) return OD_EINVAL;
-  if (op->e_o_s) dec->packet_state = OD_PACKET_DONE;
+  if (op->e_o_s)
+    dec->packet_state = OD_PACKET_DONE;
   od_ec_dec_init(&dec->ec, op->packet, op->bytes);
 #if OD_ACCOUNTING
   if (dec->acct_enabled) {
@@ -1066,8 +1068,15 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
   OD_ACCOUNTING_SET_LOCATION(dec, OD_ACCT_FRAME, 0, 0, 0);
   /*Read the packet type bit.*/
   if (od_ec_decode_bool_q15(&dec->ec, 16384, "flags")) return OD_EBADPACKET;
+  dec->state.curr_dec_frame = od_add_to_output_buff(&dec->state);
   mbctx.is_keyframe = od_ec_decode_bool_q15(&dec->ec, 16384, "flags");
   if (!mbctx.is_keyframe) {
+    frame_type = OD_I_FRAME;
+  }
+  else {
+    frame_type = OD_P_FRAME + od_ec_decode_bool_q15(&dec->ec, 16384, "flags");
+  }
+  if (frame_type == OD_P_FRAME) {
     mbctx.num_refs = od_ec_dec_uint(&dec->ec, OD_MAX_CODED_REFS, "flags") + 1;
   } else {
     mbctx.num_refs = 0;
@@ -1087,11 +1096,20 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
       }
     }
   }
-  /*Update the buffer state.*/
-  if (dec->state.ref_imgi[OD_FRAME_SELF] >= 0) {
+  /*Update the reference buffer state.*/
+  if (frame_type == OD_P_FRAME) {
     dec->state.ref_imgi[OD_FRAME_PREV] =
-     dec->state.ref_imgi[OD_FRAME_SELF];
+     dec->state.ref_imgi[OD_FRAME_NEXT];
   }
+  /*Note: Enable this if closed GOP.*/
+#if OD_CLOSED_GOP
+  if (frame_type == OD_I_FRAME)
+  {
+    int imgi;
+    /*Mark all of the reference frames are not available.*/
+    for (imgi = 0; imgi < 4; imgi++) dec->state.ref_imgi[imgi] = -1;
+  }
+#endif
   if (!mbctx.is_keyframe) {
     /*If there have been no reference frames, and we need one,
        initialize one.*/
@@ -1129,11 +1147,22 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
 #if defined(OD_DUMP_IMAGES) || defined(OD_DUMP_RECONS)
   /*Dump YUV*/
   od_state_dump_yuv(&dec->state, dec->state.out_imgs + dec->state.curr_dec_frame, "out");
+  if (OD_NUM_B_FRAMES == 0 || frame_type == OD_B_FRAME ||
+   (frame_type == OD_P_FRAME && dec->state.frames_in_out_buff >= 2) ||
+   (frame_type == OD_I_FRAME && dec->state.frames_in_out_buff >= 2) ||
+   dec->state.frames_in_out_buff == 1) {
+    int tail;
+    tail = od_get_output_buff_tail(&dec->state);
+    od_state_dump_yuv(&dec->state, dec->state.out_imgs + tail, "out");
+  }
 #endif
-  ref_img = dec->state.ref_imgs + dec->state.ref_imgi[OD_FRAME_SELF];
-  OD_ASSERT(ref_img);
-  od_img_copy(ref_img, dec->state.out_imgs + dec->state.curr_dec_frame);
-  od_img_edge_ext(ref_img);
+  if (OD_NUM_B_FRAMES == 0 || frame_type != OD_B_FRAME)
+  {
+    ref_img = dec->state.ref_imgs + dec->state.ref_imgi[OD_FRAME_SELF];
+    OD_ASSERT(ref_img);
+    od_img_copy(ref_img, dec->state.out_imgs + dec->state.curr_dec_frame);
+    od_img_edge_ext(ref_img);
+  }
   /*Return decoded frame.*/
   *img = dec->state.out_imgs[dec->state.curr_dec_frame];
   img->width = dec->state.info.pic_width;
@@ -1142,6 +1171,31 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
   if (mbctx.is_golden_frame) {
     dec->state.ref_imgi[OD_FRAME_GOLD] =
      dec->state.ref_imgi[OD_FRAME_SELF];
+  }
+  /*B frames cannot be a reference frame.*/
+  if (OD_NUM_B_FRAMES == 0) {
+    dec->state.ref_imgi[OD_FRAME_PREV] =
+     dec->state.ref_imgi[OD_FRAME_SELF];
+  }
+  else {
+    if (frame_type != OD_B_FRAME) {
+      /*1st P frame in closed GOP or 1st P in the sequence with open GOP?*/
+      if (dec->state.ref_imgi[OD_FRAME_PREV] < 0 &&
+       dec->state.ref_imgi[OD_FRAME_NEXT] < 0) {
+        /*Only previous reference frame (i.e. I frame) is available.*/
+        dec->state.ref_imgi[OD_FRAME_PREV] =
+         dec->state.ref_imgi[OD_FRAME_SELF];
+        dec->state.ref_imgi[OD_FRAME_NEXT] =
+         dec->state.ref_imgi[OD_FRAME_SELF];
+      }
+      else {
+        /*Update two reference frames.*/
+        dec->state.ref_imgi[OD_FRAME_PREV] =
+         dec->state.ref_imgi[OD_FRAME_NEXT];
+        dec->state.ref_imgi[OD_FRAME_NEXT] =
+         dec->state.ref_imgi[OD_FRAME_SELF];
+      }
+    }
   }
   return 0;
 }
