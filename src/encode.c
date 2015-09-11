@@ -2168,6 +2168,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
       return OD_EINVAL;
     }
   }
+  enc->state.curr_dec_output = -1;
   /*Buffer the input frames upto frame delay.*/
   if (OD_NUM_B_FRAMES == 0 ||
    (!last_in_frame && enc->state.frames_in_buff < enc->state.frame_delay))
@@ -2360,24 +2361,24 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
 #if defined(OD_LOGGING_ENABLED)
   od_dump_frame_metrics(&enc->state);
 #endif
-#if defined(OD_DUMP_IMAGES) || defined(OD_DUMP_RECONS)
-  /*Dump YUV*/
   if (OD_NUM_B_FRAMES == 0 || frame_type == OD_B_FRAME ||
    (frame_type == OD_I_FRAME && enc->state.enc_order_count == 0)) {
-    int tail;
-    tail = od_get_output_buff_tail(&enc->state);
-    od_state_dump_yuv(&enc->state, enc->state.out_imgs + tail, "out");
-    printf("output frame %d\n", enc->state.out_imgs_id[tail]);
-    enc->state.out_imgs_id[tail] = -1;
+    enc->state.curr_dec_output = od_get_output_buff_tail(&enc->state);
+    printf("output frame %d\n", enc->state.out_imgs_id[enc->state.curr_dec_output]);
+    enc->state.out_imgs_id[enc->state.curr_dec_output] = -1;
   }
   if ((frame_type == OD_P_FRAME || frame_type == OD_I_FRAME) &&
    enc->state.frames_in_out_buff == 2) {
-    int head;
-    head = od_get_output_buff_head(&enc->state);
-    od_state_dump_yuv(&enc->state, enc->state.out_imgs + head, "out");
-    printf("output frame %d\n", enc->state.out_imgs_id[head]);
-    enc->state.out_imgs_id[head] = -1;
+    enc->state.curr_dec_output = od_get_output_buff_head(&enc->state);
+    printf("output frame %d\n",
+     enc->state.out_imgs_id[enc->state.curr_dec_output]);
+    enc->state.out_imgs_id[enc->state.curr_dec_output] = -1;
   }
+#if defined(OD_DUMP_IMAGES) || defined(OD_DUMP_RECONS)
+  /*Dump YUV*/
+  if (enc->state.curr_dec_output >= 0)
+    od_state_dump_yuv(&enc->state,
+     enc->state.out_imgs + enc->state.curr_dec_output, "out");
 #endif
   /*Update the reference buffer state.*/
   if (mbctx.is_golden_frame) {

@@ -1061,7 +1061,6 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
   od_mb_dec_ctx mbctx;
   od_img *ref_img;
   int frame_type;
-  dec->state.curr_dec_output = -1;
   if (dec == NULL || img == NULL || op == NULL) return OD_EFAULT;
   if (dec->packet_state != OD_PACKET_DATA) return OD_EINVAL;
   if (op->e_o_s)
@@ -1075,6 +1074,7 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
   else dec->ec.acct = NULL;
 #endif
   OD_ACCOUNTING_SET_LOCATION(dec, OD_ACCT_FRAME, 0, 0, 0);
+  dec->state.curr_dec_output = -1;
   /*Read the packet type bit.*/
   if (od_ec_decode_bool_q15(&dec->ec, 16384, "flags")) return OD_EBADPACKET;
   dec->state.curr_dec_frame = od_add_to_output_buff(&dec->state);
@@ -1173,6 +1173,7 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
   }
 #if defined(OD_DUMP_IMAGES) || defined(OD_DUMP_RECONS)
   /*Dump YUV*/
+  if (dec->state.curr_dec_output >= 0)
   od_state_dump_yuv(&dec->state,
    dec->state.out_imgs + dec->state.curr_dec_output, "out");
 #endif
