@@ -1174,8 +1174,8 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
 #if defined(OD_DUMP_IMAGES) || defined(OD_DUMP_RECONS)
   /*Dump YUV*/
   if (dec->state.curr_dec_output >= 0)
-  od_state_dump_yuv(&dec->state,
-   dec->state.out_imgs + dec->state.curr_dec_output, "out");
+    od_state_dump_yuv(&dec->state,
+     dec->state.out_imgs + dec->state.curr_dec_output, "out");
 #endif
   if (dec->state.curr_dec_output >= 0)
   {

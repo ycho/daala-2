@@ -87,6 +87,10 @@ extern const int        OD_VERT_D[];
 /*The vector offsets in the Y direction for each motion compensation block
    vertex from the upper-left.*/
 # define OD_VERT_DY (OD_VERT_D+0)
+#define OD_PRINT_FRAME_TYPE(type) \
+  if (type == OD_I_FRAME) printf("I"); \
+  else if (type == OD_P_FRAME) printf("P"); \
+  else printf("B");
 extern const int *const OD_VERT_SETUP_DX[4][4];
 extern const int *const OD_VERT_SETUP_DY[4][4];
 
