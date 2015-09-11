@@ -191,6 +191,8 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
 /**Notify whether the img returned by daala_decode_packet_in() is
     actually has decoded image.*/
 int daala_decoder_output_frame_ready(daala_dec_ctx *dec);
+/**Returns # of frames left in the decoded output buffer of decoder.*/
+int daala_decoder_frames_left(daala_dec_ctx *dec);
 /*@}*/
 
 /** \defgroup decctlcodes Configuration keys for the decoder ctl interface.

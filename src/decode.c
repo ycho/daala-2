@@ -1053,6 +1053,12 @@ int daala_decoder_output_frame_ready(daala_dec_ctx *dec)
     return 0;
   if (dec->state.curr_dec_output >= 0)
     return 1;
+  return 0;
+}
+
+int daala_decoder_frames_left(daala_dec_ctx *dec)
+{
+  return dec->state.frames_in_out_buff;
 }
 
 int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
@@ -1061,6 +1067,7 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
   od_mb_dec_ctx mbctx;
   od_img *ref_img;
   int frame_type;
+  int end_of_sequence;
   if (dec == NULL || img == NULL || op == NULL) return OD_EFAULT;
   if (dec->packet_state != OD_PACKET_DATA) return OD_EINVAL;
   if (op->e_o_s)
@@ -1077,14 +1084,19 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
   dec->state.curr_dec_output = -1;
   /*Read the packet type bit.*/
   if (od_ec_decode_bool_q15(&dec->ec, 16384, "flags")) return OD_EBADPACKET;
+  /*end_of_sequence = od_ec_decode_bool_q15(&dec->ec, 16384, "flags");*/
   dec->state.curr_dec_frame = od_add_to_output_buff(&dec->state);
+  dec->state.out_imgs_id[dec->state.curr_dec_frame]
+    = dec->state.enc_order_count;
   mbctx.is_keyframe = od_ec_decode_bool_q15(&dec->ec, 16384, "flags");
   if (mbctx.is_keyframe) frame_type = OD_I_FRAME;
   else {
     frame_type = OD_P_FRAME + od_ec_decode_bool_q15(&dec->ec, 16384, "flags");
   }
-  printf("frame# : enc order %06ld : frame type %d\n",
-   dec->state.enc_order_count, frame_type);
+  printf("frame# : dec order %06ld : frame type ",
+   dec->state.enc_order_count);
+  OD_PRINT_FRAME_TYPE(frame_type);
+  printf("\n");
   if (frame_type == OD_P_FRAME) {
     mbctx.num_refs = od_ec_dec_uint(&dec->ec, OD_MAX_CODED_REFS, "flags") + 1;
   } else {
@@ -1164,11 +1176,15 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
   if (OD_NUM_B_FRAMES == 0 || frame_type == OD_B_FRAME ||
       (frame_type == OD_I_FRAME && dec->state.enc_order_count == 0)) {
     dec->state.curr_dec_output = od_get_output_buff_tail(&dec->state);
+    printf("OUTPUT frame %d\n",
+     dec->state.out_imgs_id[dec->state.curr_dec_output]);
     dec->state.out_imgs_id[dec->state.curr_dec_output] = -1;
-  }
+  } else
   if ((frame_type == OD_P_FRAME || frame_type == OD_I_FRAME) &&
    dec->state.frames_in_out_buff == 2) {
     dec->state.curr_dec_output = od_get_output_buff_head(&dec->state);
+    printf("OUTPUT frame %d\n",
+     dec->state.out_imgs_id[dec->state.curr_dec_output]);
     dec->state.out_imgs_id[dec->state.curr_dec_output] = -1;
   }
 #if defined(OD_DUMP_IMAGES) || defined(OD_DUMP_RECONS)
@@ -1185,6 +1201,8 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
     img->height = dec->state.info.pic_height;
     dec->state.cur_time++;
   }
+  printf("  # frames left in output buffer = %d\n",
+   dec->state.frames_in_out_buff);
   if (mbctx.is_golden_frame) {
     dec->state.ref_imgi[OD_FRAME_GOLD] =
      dec->state.ref_imgi[OD_FRAME_SELF];

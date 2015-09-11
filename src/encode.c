@@ -53,8 +53,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 # include "x86/x86int.h"
 #endif
 
-#define OD_DUMP_IMAGES
-
 /* These are the PVQ equivalent of quantization matrices, except that
    the values are per-band. */
 #define OD_MASKING_DISABLED 0
@@ -2380,14 +2378,14 @@ skip_encoding:
   if ((frame_type == OD_P_FRAME || frame_type == OD_I_FRAME) &&
    enc->state.frames_in_out_buff == 2) {
     enc->state.curr_dec_output = od_get_output_buff_head(&enc->state);
-    printf("output frame %d\n",
+    printf("OUTPUT frame %d\n",
      enc->state.out_imgs_id[enc->state.curr_dec_output]);
     enc->state.out_imgs_id[enc->state.curr_dec_output] = -1;
   } else
-  /*Last frame in the sequence?*/
+  /*Last frame (and it is either P or I (with open GOP)) in the sequence?*/
   if (enc->state.frames_in_buff == 0 && enc->state.frames_in_out_buff > 0) {
     enc->state.curr_dec_output = od_get_output_buff_head(&enc->state);
-    printf("output frame %d\n",
+    printf("OUTPUT frame %d\n",
      enc->state.out_imgs_id[enc->state.curr_dec_output]);
     enc->state.out_imgs_id[enc->state.curr_dec_output] = -1;
   }
