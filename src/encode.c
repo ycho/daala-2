@@ -2076,7 +2076,7 @@ static int od_get_input_buff_head(od_state *state)
   /*Update the head of in_buff[].*/
   state->in_buff_head = (head + 1) % state->frame_delay;
   state->frames_in_buff -= 1;
-  printf("Fetch frame %d at HEAD of input_buff\n", state->in_imgs_id[head]);
+  printf("FETCH frame %d at HEAD of input_buff\n", state->in_imgs_id[head]);
   return head;
 }
 
@@ -2088,7 +2088,7 @@ static int od_get_input_buff_tail(od_state *state)
   /*Update the tail of in_buff[].*/
   state->in_buff_ptr = (tail - 1 + state->frame_delay) % state->frame_delay;
   state->frames_in_buff -= 1;
-  printf("Fetch frame %d at TAIL of input_buff\n", state->in_imgs_id[tail]);
+  printf("FETCH frame %d at TAIL of input_buff\n", state->in_imgs_id[tail]);
   return tail;
 }
 
@@ -2437,7 +2437,7 @@ skip_encoding:
   {
     /*If input buffer is empty, signal that it is the last output frame.*/
     *last_out_frame =
-     (input_frames_left == 0 && enc->state.frames_in_out_buff == 0);
+     (input_frames_left <= 0 && enc->state.frames_in_out_buff <= 0);
   }
   else
     *last_out_frame = last_in_frame;

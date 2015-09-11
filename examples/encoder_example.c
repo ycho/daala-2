@@ -290,7 +290,9 @@ int fetch_and_process_video(av_input *avin, ogg_page *page,
  ogg_stream_state *vo, daala_enc_ctx *dd, int video_ready,
  int *limit, int *skip) {
   ogg_packet op;
+  /*Last input frame to the encoder?*/
   static int last_in_frame = 0;
+  /*Last output frame is emitted from encoder?*/
   static int last_out_frame = 0;
   while (!video_ready) {
     size_t ret;
@@ -350,6 +352,9 @@ int fetch_and_process_video(av_input *avin, ogg_page *page,
       }
       else last_in_frame = 1;
     }
+    /*Last output frame is emitted from encoder?*/
+    if (last_out_frame)
+      return 0;
     /*Pull the packets from the previous frame, now that we know whether or not
        we can read the current one.
       This is used to set the e_o_s bit on the final packet.*/
