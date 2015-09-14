@@ -398,14 +398,14 @@ int main(int argc, char *argv[]) {
   }
   while (!got_sigint) {
     while (daala_p && !videobuf_ready) {
-      if (ogg_stream_packetout(&to, &op) > 0 /*||
-       daala_decoder_frames_left(dd) > 0*/) {
+      if (ogg_stream_packetout(&to, &op) > 0) {
         if (daala_decode_packet_in(dd, &img, &op) >= 0) {
           videobuf_ready = 1;
           frames++;
         }
       }
-      else break;
+      else
+        break;
     }
     if (!videobuf_ready && feof(infile)) break;
     if (!videobuf_ready) {
@@ -417,6 +417,11 @@ int main(int argc, char *argv[]) {
     }
     else if (outfile && daala_decoder_output_frame_ready(dd)) video_write();
     videobuf_ready = 0;
+  }
+  /*Flush the output frame buffer of decoder.*/
+  if (!got_sigint && daala_decoder_frames_left(dd) > 0) {
+    daala_decode_packet_in(dd, &img, &op);
+    if (daala_decoder_output_frame_ready(dd)) video_write();
   }
   /* end of decoder loop -- close everything */
   if (daala_p) {

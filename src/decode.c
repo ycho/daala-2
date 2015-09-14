@@ -1067,10 +1067,13 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
   od_mb_dec_ctx mbctx;
   od_img *ref_img;
   int frame_type;
-  int end_of_sequence;
+  static int last_frame_decoded = 0;
+  dec->state.curr_dec_output = -1;
   printf("---------------------------------------------------------------\n");
   if (dec == NULL || img == NULL || op == NULL) return OD_EFAULT;
-  if (dec->packet_state != OD_PACKET_DATA) return OD_EINVAL;
+  if (last_frame_decoded) goto skip_decoding;
+  if (dec->packet_state != OD_PACKET_DATA)
+    return OD_EINVAL;
   if (op->e_o_s)
     dec->packet_state = OD_PACKET_DONE;
   od_ec_dec_init(&dec->ec, op->packet, op->bytes);
@@ -1082,7 +1085,6 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
   else dec->ec.acct = NULL;
 #endif
   OD_ACCOUNTING_SET_LOCATION(dec, OD_ACCT_FRAME, 0, 0, 0);
-  dec->state.curr_dec_output = -1;
   /*Read the packet type bit.*/
   if (od_ec_decode_bool_q15(&dec->ec, 16384, "flags")) return OD_EBADPACKET;
   /*end_of_sequence = od_ec_decode_bool_q15(&dec->ec, 16384, "flags");*/
@@ -1179,14 +1181,21 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
   if (OD_NUM_B_FRAMES == 0 || frame_type == OD_B_FRAME ||
       (frame_type == OD_I_FRAME && dec->state.enc_order_count == 0)) {
     dec->state.curr_dec_output = od_get_output_buff_tail(&dec->state);
-    printf("OUTPUT frame %d\n",
+    printf("OUTPUT frame# %d (enc order)\n",
      dec->state.out_imgs_id[dec->state.curr_dec_output]);
     dec->state.out_imgs_id[dec->state.curr_dec_output] = -1;
   } else
   if ((frame_type == OD_P_FRAME || frame_type == OD_I_FRAME) &&
    dec->state.frames_in_out_buff == 2) {
     dec->state.curr_dec_output = od_get_output_buff_head(&dec->state);
-    printf("OUTPUT frame %d\n",
+    printf("OUTPUT frame# %d (enc order)\n",
+     dec->state.out_imgs_id[dec->state.curr_dec_output]);
+    dec->state.out_imgs_id[dec->state.curr_dec_output] = -1;
+  }
+skip_decoding:
+  if (last_frame_decoded && dec->state.frames_in_out_buff > 0) {
+    dec->state.curr_dec_output = od_get_output_buff_head(&dec->state);
+    printf("OUTPUT frame# %d (enc order)\n",
      dec->state.out_imgs_id[dec->state.curr_dec_output]);
     dec->state.out_imgs_id[dec->state.curr_dec_output] = -1;
   }
@@ -1235,6 +1244,8 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
       }
     }
   }
+  if (dec->packet_state == OD_PACKET_DONE)
+    last_frame_decoded = 1;
   ++dec->state.enc_order_count;
   return 0;
 }

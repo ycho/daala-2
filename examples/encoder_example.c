@@ -293,7 +293,7 @@ int fetch_and_process_video(av_input *avin, ogg_page *page,
   /*Last input frame to the encoder?*/
   static int last_in_frame = 0;
   /*Last output frame is emitted from encoder?*/
-  static int last_out_frame = 0;
+  static int last_frame_encoded = 0;
   while (!video_ready) {
     size_t ret;
     char frame[6];
@@ -354,15 +354,16 @@ int fetch_and_process_video(av_input *avin, ogg_page *page,
     /*Pull the packets from the previous frame, now that we know whether or not
        we can read the current one.
       This is used to set the e_o_s bit on the final packet.*/
-    while (daala_encode_packet_out(dd, last_out_frame, &op)) {
+    while (daala_encode_packet_out(dd, last_frame_encoded, &op)) {
       ogg_stream_packetin(vo, &op);
     }
     /*Submit the current frame for encoding.*/
     /*If B frames are used, then daala_encode_img_in() will buffer
        the input frames for B in in_imgs[] (i.e. frame delay),
        until it encode P frame.*/
-    if (!last_out_frame)
-      daala_encode_img_in(dd, &avin->video_img, 0, last_in_frame, &last_out_frame);
+    if (!last_frame_encoded)
+      daala_encode_img_in(dd, &avin->video_img, 0, last_in_frame,
+       &last_frame_encoded);
   }
   return video_ready;
 }

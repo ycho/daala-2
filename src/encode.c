@@ -2167,7 +2167,7 @@ static int determine_frame_type(od_state *state)
 }
 
 int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
-     int last_in_frame, int *last_out_frame) {
+     int last_in_frame, int *last_frame_encoded) {
   int refi;
   int nplanes;
   int pli;
@@ -2213,8 +2213,8 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   /*If buffer is not filled as required, don't proceed to encoding.*/
   if (!last_in_frame && enc->state.frames_in_buff < enc->state.frame_delay)
   {
-    printf("  last_in_frame? %d, last_out_frame? %d\n",
-     last_in_frame, *last_out_frame);
+    printf("  last_in_frame? %d, last_frame_encoded? %d\n",
+     last_in_frame, *last_frame_encoded);
     return 0;
   }
   use_masking = enc->use_activity_masking;
@@ -2475,14 +2475,14 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   {
     /*If input buffer is empty,
        signal that no more output bitstream will be written.*/
-    *last_out_frame =
+    *last_frame_encoded =
      /*(input_frames_left <= 0 && enc->state.frames_in_out_buff <= 0);*/
      (enc->state.frames_in_buff <= 0);
   }
   else
-    *last_out_frame = last_in_frame;
-  printf("  last_in_frame? %d, last_out_frame? %d\n",
-   last_in_frame, *last_out_frame);
+    *last_frame_encoded = last_in_frame;
+  printf("  last_in_frame? %d, last_frame_encoded? %d\n",
+   last_in_frame, *last_frame_encoded);
   if (enc->state.info.frame_duration == 0) enc->state.cur_time += duration;
   else enc->state.cur_time += enc->state.info.frame_duration;
 #if defined(OD_DUMP_BSIZE_DIST)
