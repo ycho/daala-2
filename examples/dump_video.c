@@ -398,8 +398,8 @@ int main(int argc, char *argv[]) {
   }
   while (!got_sigint) {
     while (daala_p && !videobuf_ready) {
-      if (ogg_stream_packetout(&to, &op) > 0 ||
-       daala_decoder_frames_left(dd) > 0) {
+      if (ogg_stream_packetout(&to, &op) > 0 /*||
+       daala_decoder_frames_left(dd) > 0*/) {
         if (daala_decode_packet_in(dd, &img, &op) >= 0) {
           videobuf_ready = 1;
           frames++;

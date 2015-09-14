@@ -302,8 +302,7 @@ int fetch_and_process_video(av_input *avin, ogg_page *page,
       return 1;
     else if (ogg_stream_eos(vo))
       return 0;
-    if (!last_in_frame)
-    {
+    if (!last_in_frame) {
       ret = fread(frame, 1, 6, avin->video_infile);
       if (ret == 6) {
         od_img *img;
@@ -352,9 +351,6 @@ int fetch_and_process_video(av_input *avin, ogg_page *page,
       }
       else last_in_frame = 1;
     }
-    /*Last output frame is emitted from encoder?*/
-    if (last_out_frame)
-      return 0;
     /*Pull the packets from the previous frame, now that we know whether or not
        we can read the current one.
       This is used to set the e_o_s bit on the final packet.*/

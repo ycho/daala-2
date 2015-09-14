@@ -1068,6 +1068,7 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
   od_img *ref_img;
   int frame_type;
   int end_of_sequence;
+  printf("---------------------------------------------------------------\n");
   if (dec == NULL || img == NULL || op == NULL) return OD_EFAULT;
   if (dec->packet_state != OD_PACKET_DATA) return OD_EINVAL;
   if (op->e_o_s)
@@ -1145,6 +1146,7 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
    || refi == dec->state.ref_imgi[OD_FRAME_NEXT]; refi++);
   dec->state.ref_imgi[OD_FRAME_SELF] = refi;
   od_adapt_ctx_reset(&dec->state.adapt, mbctx.is_keyframe);
+#if 1
   if (!mbctx.is_keyframe) {
     od_dec_mv_unpack(dec, mbctx.num_refs);
     od_state_mc_predict(&dec->state);
@@ -1154,6 +1156,7 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
     }
   }
   od_decode_coefficients(dec, &mbctx);
+#endif
   if (dec->user_bsize != NULL) {
     int j;
     int nhsb;

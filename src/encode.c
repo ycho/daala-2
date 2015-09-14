@@ -2181,8 +2181,10 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   static int input_frames_left = 1;
   int frame_type;
   printf("---------------------------------------------------------------\n");
-  if (enc == NULL || img == NULL) return OD_EFAULT;
-  if (enc->packet_state == OD_PACKET_DONE) return OD_EINVAL;
+  if (enc == NULL || img == NULL)
+    return OD_EFAULT;
+  if (enc->packet_state == OD_PACKET_DONE)
+    return OD_EINVAL;
   /*Check the input image dimensions to make sure they're compatible with the
      declared video size.*/
   nplanes = enc->state.info.nplanes;
@@ -2215,8 +2217,9 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
      last_in_frame, *last_out_frame);
     return 0;
   }
-  if (enc->state.frames_in_buff == 0 && enc->state.frames_in_out_buff > 0)
+  if (enc->state.frames_in_buff == 0 && enc->state.frames_in_out_buff > 0) {
     goto skip_encoding;
+  }
   use_masking = enc->use_activity_masking;
   frame_width = enc->state.frame_width;
   frame_height = enc->state.frame_height;
@@ -2370,6 +2373,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   od_state_dump_img(&enc->state, enc->state.in_imgs + enc->state.curr_frame,
    "input");
 #endif
+#if 1
   if (!mbctx.is_keyframe) {
     od_predict_frame(enc);
     od_encode_mvs(enc, mbctx.num_refs);
@@ -2379,6 +2383,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   if (enc->complexity >= 2) od_split_superblocks_rdo(enc, &mbctx);
   else od_split_superblocks(enc, mbctx.is_keyframe);
   od_encode_coefficients(enc, &mbctx, OD_ENCODE_REAL);
+#endif
   enc->packet_state = OD_PACKET_READY;
 
   if (OD_NUM_B_FRAMES == 0 || frame_type != OD_B_FRAME)
@@ -2419,8 +2424,22 @@ skip_encoding:
   if (enc->state.curr_dec_output >= 0)
     od_state_dump_yuv(&enc->state,
      enc->state.out_imgs + enc->state.curr_dec_output, "out");
+  /*Flush the output frame buffer.*/
+  /*If all the frames are encoded but a frame, which will be either P or I,
+     is left in a output buffer, then emit it.*/
+  if (enc->state.frames_in_buff <= 0 && enc->state.frames_in_out_buff == 1)
+  {
+    enc->state.curr_dec_output = od_get_output_buff_head(&enc->state);
+    printf("OUTPUT frame %d\n",
+     enc->state.out_imgs_id[enc->state.curr_dec_output]);
+    enc->state.out_imgs_id[enc->state.curr_dec_output] = -1;
+    if (enc->state.curr_dec_output >= 0)
+      od_state_dump_yuv(&enc->state,
+       enc->state.out_imgs + enc->state.curr_dec_output, "out");
+  }
 #endif
   printf("  # frames left in output buffer = %d\n", enc->state.frames_in_out_buff);
+  printf("  # frames left in input buffer = %d\n", enc->state.frames_in_buff);
   /*Update the reference buffer state.*/
   if (mbctx.is_golden_frame) {
     enc->state.ref_imgi[OD_FRAME_GOLD] =
@@ -2458,9 +2477,11 @@ skip_encoding:
 #endif
   if (OD_NUM_B_FRAMES > 0)
   {
-    /*If input buffer is empty, signal that it is the last output frame.*/
+    /*If input buffer is empty,
+       signal that no more output bitstream will be written.*/
     *last_out_frame =
-     (input_frames_left <= 0 && enc->state.frames_in_out_buff <= 0);
+     /*(input_frames_left <= 0 && enc->state.frames_in_out_buff <= 0);*/
+     (enc->state.frames_in_buff <= 0);
   }
   else
     *last_out_frame = last_in_frame;
@@ -2535,8 +2556,10 @@ int daala_encode_packet_out(daala_enc_ctx *enc, int last, ogg_packet *op) {
   op->e_o_s = last;
   op->packetno = 0;
   op->granulepos = enc->state.cur_time;
-  if (last) enc->packet_state = OD_PACKET_DONE;
-  else enc->packet_state = OD_PACKET_EMPTY;
+  if (last)
+    enc->packet_state = OD_PACKET_DONE;
+  else
+    enc->packet_state = OD_PACKET_EMPTY;
 
 #if defined(OD_ENCODER_CHECK)
   /*Compare reconstructed frame against decoded frame.*/
