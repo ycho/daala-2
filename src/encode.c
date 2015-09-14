@@ -713,16 +713,23 @@ static double od_compute_dist_8x8(daala_enc_ctx *enc, od_coeff *x, od_coeff *y,
   double calibration;
   int i;
   int j;
+  double vardist;
+  vardist = 0;
   OD_ASSERT(enc->qm != OD_FLAT_QM);
 #if 1
   min_var = INT_MAX;
   mean_var = 0;
   for (i = 0; i < 3; i++) {
     for (j = 0; j < 3; j++) {
-      int var;
-      var = od_compute_var_4x4(x + 2*i*stride + 2*j, stride);
-      min_var = OD_MINI(min_var, var);
-      mean_var += 1./(1+var);
+      int varx;
+      int vary;
+      double diff;
+      varx = od_compute_var_4x4(x + 2*i*stride + 2*j, stride);
+      vary = od_compute_var_4x4(y + 2*i*stride + 2*j, stride);
+      min_var = OD_MINI(min_var, varx);
+      mean_var += 1./(1 + varx);
+      diff = sqrt(varx) - sqrt(vary);
+      vardist += diff*diff;
     }
   }
   /* We use a different variance statistic depending on whether activity
@@ -761,7 +768,7 @@ static double od_compute_dist_8x8(daala_enc_ctx *enc, od_coeff *x, od_coeff *y,
       sum += et[8*i + j]*(double)et[8*i + j]*mag;
     }
   }
-  return activity*activity*sum;
+  return activity*activity*(sum + vardist);
 }
 
 static double od_compute_dist(daala_enc_ctx *enc, od_coeff *x, od_coeff *y,
@@ -1865,6 +1872,8 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
         output = &state->ctmp[pli][(sby << ln)*w + (sbx << ln)];
         unfiltered_error = 0;
         filtered_error = 0;
+#if 0
+        /* Optimize deringing for PSNR. */
         for (y = 0; y < n; y++) {
           for (x = 0; x < n; x++) {
             int r;
@@ -1877,6 +1886,22 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
             unfiltered_error += (r - o)*(double)(r - o);
           }
         }
+#else
+        /* Optimize deringing for the block size decision metric. */
+        {
+          od_coeff orig[OD_BSIZE_MAX*OD_BSIZE_MAX];
+          od_coeff out[OD_BSIZE_MAX*OD_BSIZE_MAX];
+          for (y = 0; y < n; y++) {
+            for (x = 0; x < n; x++) {
+              orig[y*OD_BSIZE_MAX + x] = (input[y*ystride + x] - 128)
+               << OD_COEFF_SHIFT;
+              out[y*OD_BSIZE_MAX + x] = output[y*w + x];
+            }
+          }
+          unfiltered_error = od_compute_dist(enc, orig, out, OD_BSIZE_MAX, 3);
+          filtered_error = od_compute_dist(enc, orig, buf, OD_BSIZE_MAX, 3);
+        }
+#endif
         up = 0;
         if (sby > 0) {
           up = state->clpf_flags[(sby-1)*nhsb + sbx];
@@ -1889,8 +1914,8 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
         filtered_rate = od_encode_cdf_cost(1, state->adapt.clpf_cdf[c], 2);
         unfiltered_rate = od_encode_cdf_cost(0, state->adapt.clpf_cdf[c], 2);
         q2 = enc->quantizer[0] * enc->quantizer[0];
-        filtered = (filtered_error + 0.1*q2*filtered_rate) <
-         (unfiltered_error + 0.1*q2*unfiltered_rate);
+        filtered = (filtered_error + OD_PVQ_LAMBDA*q2*filtered_rate) <
+         (unfiltered_error + OD_PVQ_LAMBDA*q2*unfiltered_rate);
         state->clpf_flags[sby*nhsb + sbx] = filtered;
         od_encode_cdf_adapt(&enc->ec, filtered, state->adapt.clpf_cdf[c], 2,
          state->adapt.clpf_increment);
