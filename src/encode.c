@@ -2217,9 +2217,6 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
      last_in_frame, *last_out_frame);
     return 0;
   }
-  if (enc->state.frames_in_buff == 0 && enc->state.frames_in_out_buff > 0) {
-    goto skip_encoding;
-  }
   use_masking = enc->use_activity_masking;
   frame_width = enc->state.frame_width;
   frame_height = enc->state.frame_height;
@@ -2398,7 +2395,6 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
 #if defined(OD_LOGGING_ENABLED)
   od_dump_frame_metrics(&enc->state);
 #endif
-skip_encoding:
   if (OD_NUM_B_FRAMES == 0 || frame_type == OD_B_FRAME ||
    (frame_type == OD_I_FRAME && enc->state.enc_order_count == 0)) {
     enc->state.curr_dec_output = od_get_output_buff_tail(&enc->state);
