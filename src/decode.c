@@ -1087,14 +1087,21 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
   OD_ACCOUNTING_SET_LOCATION(dec, OD_ACCT_FRAME, 0, 0, 0);
   /*Read the packet type bit.*/
   if (od_ec_decode_bool_q15(&dec->ec, 16384, "flags")) return OD_EBADPACKET;
-  /*end_of_sequence = od_ec_decode_bool_q15(&dec->ec, 16384, "flags");*/
-  dec->state.curr_dec_frame = od_add_to_output_buff(&dec->state);
+  if (OD_NUM_B_FRAMES > 0)
+    dec->state.curr_dec_frame = od_add_to_output_buff(&dec->state);
+  else {
+    dec->state.curr_dec_frame = 0;
+    dec->state.frames_in_out_buff += 1;
+  }
   dec->state.out_imgs_id[dec->state.curr_dec_frame]
     = dec->state.enc_order_count;
   mbctx.is_keyframe = od_ec_decode_bool_q15(&dec->ec, 16384, "flags");
   if (mbctx.is_keyframe) frame_type = OD_I_FRAME;
   else {
-    frame_type = OD_P_FRAME + od_ec_decode_bool_q15(&dec->ec, 16384, "flags");
+    if (od_ec_decode_bool_q15(&dec->ec, 16384, "flags"))
+        frame_type = OD_B_FRAME;
+    else
+        frame_type = OD_P_FRAME;
   }
   printf("frame# : dec order %06ld : frame type ",
    dec->state.enc_order_count);
@@ -1178,23 +1185,23 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
     od_img_edge_ext(ref_img);
   }
   /*Determine output frame in output buffer.*/
+  if (OD_NUM_B_FRAMES == 0) {
+    dec->state.curr_dec_output = 0;
+    dec->state.frames_in_out_buff -= 1;
+  } else
   if (OD_NUM_B_FRAMES == 0 || frame_type == OD_B_FRAME ||
       (frame_type == OD_I_FRAME && dec->state.enc_order_count == 0)) {
     dec->state.curr_dec_output = od_get_output_buff_tail(&dec->state);
-    printf("OUTPUT frame# %d (enc order)\n",
-     dec->state.out_imgs_id[dec->state.curr_dec_output]);
-    dec->state.out_imgs_id[dec->state.curr_dec_output] = -1;
   } else
   if ((frame_type == OD_P_FRAME || frame_type == OD_I_FRAME) &&
    dec->state.frames_in_out_buff == 2) {
     dec->state.curr_dec_output = od_get_output_buff_head(&dec->state);
-    printf("OUTPUT frame# %d (enc order)\n",
-     dec->state.out_imgs_id[dec->state.curr_dec_output]);
-    dec->state.out_imgs_id[dec->state.curr_dec_output] = -1;
   }
 skip_decoding:
   if (last_frame_decoded && dec->state.frames_in_out_buff > 0) {
     dec->state.curr_dec_output = od_get_output_buff_head(&dec->state);
+  }
+  if (dec->state.curr_dec_output >= 0) {
     printf("OUTPUT frame# %d (enc order)\n",
      dec->state.out_imgs_id[dec->state.curr_dec_output]);
     dec->state.out_imgs_id[dec->state.curr_dec_output] = -1;

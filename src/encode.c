@@ -2242,7 +2242,10 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
     else
       enc->state.curr_frame = od_get_input_buff_head(&enc->state);
   }
-  else enc->state.curr_frame = 0;
+  else {
+    enc->state.curr_frame = 0;
+    enc->state.frames_in_buff -= 1;
+  }
   enc->state.curr_display_order = enc->state.in_imgs_id[enc->state.curr_frame];
   /*printf("display order = %d\n", enc->state.curr_display_order);*/
   printf("ENCODE frame#: %06ld(enc order), %06ld(display order) : frame type ",
@@ -2258,7 +2261,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
     mbctx.is_golden_frame = 1;
   }
   /*Update the reference buffer state.*/
-  if (frame_type == OD_P_FRAME) {
+  if (OD_NUM_B_FRAMES != 0 && frame_type == OD_P_FRAME) {
     enc->state.ref_imgi[OD_FRAME_PREV] =
      enc->state.ref_imgi[OD_FRAME_NEXT];
   }
@@ -2476,7 +2479,6 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
     /*If input buffer is empty,
        signal that no more output bitstream will be written.*/
     *last_frame_encoded =
-     /*(input_frames_left <= 0 && enc->state.frames_in_out_buff <= 0);*/
      (enc->state.frames_in_buff <= 0);
   }
   else
@@ -2495,6 +2497,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   }
   fprintf(enc->bsize_dist_file, "\n");
 #endif
+  OD_ASSERT(mbctx.is_keyframe == (frame_type == OD_I_FRAME));
   enc->state.in_imgs_id[enc->state.curr_frame] = -1;
   ++enc->state.enc_order_count;
   return 0;

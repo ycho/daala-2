@@ -2958,6 +2958,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
         mvg->mv[1] = mvy0 << 3;
         mvg->mv1[0] = mvx1 << 3;
         mvg->mv1[1] = mvy1 << 3;
+        /*Mark as 'bi-directionally' predicted.*/
         mvg->ref = 2;
         mvg->valid = 1;
         mv->bma_sad = sad;
@@ -3001,6 +3002,9 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
     }
 #endif
   }
+  /*if (state->frame_type == OD_B_FRAME && ref == OD_FRAME_NEXT) {
+    printf("block size %2d, ref = %d\n", mvb_sz << OD_LOG_MVBSIZE_MIN, mvg->ref);
+  }*/
 }
 
 static void od_mv_est_init_mvs(od_mv_est_ctx *est, int ref, int must_update) {
