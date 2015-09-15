@@ -1095,6 +1095,7 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
   }
   dec->state.out_imgs_id[dec->state.curr_dec_frame]
     = dec->state.enc_order_count;
+#if 0
   mbctx.is_keyframe = od_ec_decode_bool_q15(&dec->ec, 16384, "flags");
   if (mbctx.is_keyframe) frame_type = OD_I_FRAME;
   else {
@@ -1103,10 +1104,13 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
     else
         frame_type = OD_P_FRAME;
   }
+#endif
+  frame_type = od_ec_dec_uint(&dec->ec, 3, "flags");
   printf("frame# : dec order %06ld : frame type ",
    dec->state.enc_order_count);
   OD_PRINT_FRAME_TYPE(frame_type);
   printf("\n");
+  mbctx.is_keyframe = (frame_type == OD_I_FRAME);
   if (frame_type == OD_P_FRAME) {
     mbctx.num_refs = od_ec_dec_uint(&dec->ec, OD_MAX_CODED_REFS, "flags") + 1;
   } else {
@@ -1128,7 +1132,7 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
     }
   }
   /*Update the reference buffer state.*/
-  if (frame_type == OD_P_FRAME) {
+  if (OD_NUM_B_FRAMES != 0 && frame_type == OD_P_FRAME) {
     dec->state.ref_imgi[OD_FRAME_PREV] =
      dec->state.ref_imgi[OD_FRAME_NEXT];
   }

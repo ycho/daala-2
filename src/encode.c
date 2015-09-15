@@ -2304,11 +2304,14 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   od_ec_enc_reset(&enc->ec);
   /*Write a bit to mark this as a data packet.*/
   od_ec_encode_bool_q15(&enc->ec, 0, 16384);
+#if 0
   /*Code the keyframe bit.*/
   od_ec_encode_bool_q15(&enc->ec, mbctx.is_keyframe, 16384);
   /*If not I frame, code the bit to tell whether it is P or B frame.*/
   if (!mbctx.is_keyframe)
   	od_ec_encode_bool_q15(&enc->ec, frame_type == OD_B_FRAME, 16384);
+#endif
+  od_ec_enc_uint(&enc->ec, frame_type, 3);
   /* Code the number of references. */
   if (frame_type == OD_P_FRAME) {
     od_ec_enc_uint(&enc->ec, mbctx.num_refs - 1, OD_MAX_CODED_REFS);
