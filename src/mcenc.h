@@ -48,7 +48,8 @@ typedef uint16_t od_sad4[4];
 struct od_mv_node {
   /*The historical motion vectors for EPZS^2, stored at full-pel resolution.
     Indexed by [time][reference_type][component].*/
-  int bma_mvs[3][2][2];
+  /*reference_type : OD_FRAME_GOLD, OD_FRAME_PREV, OD_FRAME_NEXT*/
+  int bma_mvs[3][3][2];
   /*The current estimated rate of this MV.*/
   unsigned mv_rate:16;
   /*The current size of the block with this MV at its upper-left.*/

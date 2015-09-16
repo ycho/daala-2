@@ -181,7 +181,7 @@ struct od_state{
   /** Pointers to the ref images so one can move them around without coping
       them. */
   od_img              ref_imgs[4];
-  /** Pointer to input and output image. */
+  /** Input and output images buffer, used as circular queue. */
   od_img              in_imgs[1 + OD_NUM_B_FRAMES];
   od_img              out_imgs[1 + OD_NUM_B_FRAMES];
   /* ----------------------------------------------------- */
