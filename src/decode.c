@@ -1111,7 +1111,7 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
   OD_PRINT_FRAME_TYPE(frame_type);
   printf("\n");
   mbctx.is_keyframe = (frame_type == OD_I_FRAME);
-  if (frame_type == OD_P_FRAME) {
+  if (frame_type != OD_I_FRAME) {
     mbctx.num_refs = od_ec_dec_uint(&dec->ec, OD_MAX_CODED_REFS, "flags") + 1;
   } else {
     mbctx.num_refs = 0;
@@ -1181,7 +1181,7 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
        &dec->state.bsize[dec->state.bstride*j], nhsb*4);
     }
   }
-  if (OD_NUM_B_FRAMES == 0 || frame_type != OD_B_FRAME)
+  if (frame_type != OD_B_FRAME)
   {
     ref_img = dec->state.ref_imgs + dec->state.ref_imgi[OD_FRAME_SELF];
     OD_ASSERT(ref_img);

@@ -407,8 +407,8 @@ static int od_state_init_impl(od_state *state, const daala_info *info) {
   state->enc_order_count = 0;
   state->display_order_count = -1;
   for (i = 0; i < 1 + OD_NUM_B_FRAMES; i++) {
-  state->in_imgs_id[i] = -1;
-  state->out_imgs_id[i] = -1;
+    state->in_imgs_id[i] = -1;
+    state->out_imgs_id[i] = -1;
   }
   return OD_SUCCESS;
 }

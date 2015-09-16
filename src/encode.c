@@ -1459,7 +1459,7 @@ static void od_img_copy_pad(od_state *state, od_img *img) {
   int pli;
   int nplanes;
   OD_ASSERT(state->in_buff_ptr >= OD_FRAME_INPUT &&
-   state->in_buff_ptr < 2 + OD_NUM_B_FRAMES);
+   state->in_buff_ptr < 1 + OD_NUM_B_FRAMES);
   nplanes = img->nplanes;
   /* Copy and pad the image. */
   for (pli = 0; pli < nplanes; pli++) {
@@ -2159,8 +2159,8 @@ static int determine_frame_type(od_state *state)
     else
       frame_type = OD_B_FRAME;
   }
-  else
-  { /*1st frame.*/
+  else {
+    /*1st frame.*/
     frame_type = OD_I_FRAME;
   }
   return frame_type;
@@ -2232,7 +2232,8 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   }
   /*Determine a frame type.*/
   frame_type = determine_frame_type(&enc->state);
-  /*If P frame, the input frame is at tail, otherwise input is at head.*/
+  /*If P frame or I with open GOP, the input frame is at tail,
+     otherwise input is at head.*/
   if (OD_NUM_B_FRAMES > 0)
   {
     if (frame_type == OD_P_FRAME ||
@@ -2292,7 +2293,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   mbctx.frame_type = frame_type;
   enc->state.frame_type = frame_type;
   /*Only P frame can use golden reference frame.*/
-  mbctx.num_refs = (frame_type == OD_P_FRAME) ? OD_MAX_CODED_REFS : 0;
+  mbctx.num_refs = (frame_type != OD_I_FRAME) ? OD_MAX_CODED_REFS : 0;
   /* FIXME: This should be dynamic */
   mbctx.use_activity_masking = enc->use_activity_masking;
   mbctx.qm = enc->qm;
@@ -2313,7 +2314,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
 #endif
   od_ec_enc_uint(&enc->ec, frame_type, 3);
   /* Code the number of references. */
-  if (frame_type == OD_P_FRAME) {
+  if (frame_type != OD_I_FRAME) {
     od_ec_enc_uint(&enc->ec, mbctx.num_refs - 1, OD_MAX_CODED_REFS);
   }
   /*Code whether or not activity masking is being used.*/
@@ -2389,7 +2390,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
 #endif
   enc->packet_state = OD_PACKET_READY;
 
-  if (OD_NUM_B_FRAMES == 0 || frame_type != OD_B_FRAME)
+  if (frame_type != OD_B_FRAME)
   {
     /*Copy full-pel ref image from state.out_imgs[state->curr_dec_frame]
        to state.ref_imgs[].*/

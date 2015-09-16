@@ -2922,6 +2922,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
 #endif
   /*previous_cost is our previous best cost from a previous pass of phase 1.*/
   previous_cost = (mv->bma_sad << OD_ERROR_SCALE) + mv->mv_rate*est->lambda;
+#if 0
   if (OD_NUM_B_FRAMES)
   {
     /*Current frame is B and its 2nd (i.e. backward) prediction?*/
@@ -2968,6 +2969,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
       }
     }
   }
+#endif
   if (must_update || (best_cost < previous_cost)) {
     OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
      "Found a better SAD then previous best."));
