@@ -1085,6 +1085,8 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
   else dec->ec.acct = NULL;
 #endif
   OD_ACCOUNTING_SET_LOCATION(dec, OD_ACCT_FRAME, 0, 0, 0);
+  printf(" bits so far = %.3f.\n",
+   (float)od_ec_dec_tell_frac(&dec->ec)/8);
   /*Read the packet type bit.*/
   if (od_ec_decode_bool_q15(&dec->ec, 16384, "flags")) return OD_EBADPACKET;
   if (OD_NUM_B_FRAMES > 0)
@@ -1095,7 +1097,7 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
   }
   dec->state.out_imgs_id[dec->state.curr_dec_frame]
     = dec->state.enc_order_count;
-#if 0
+#if 1
   mbctx.is_keyframe = od_ec_decode_bool_q15(&dec->ec, 16384, "flags");
   if (mbctx.is_keyframe) frame_type = OD_I_FRAME;
   else {
@@ -1104,13 +1106,14 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
     else
         frame_type = OD_P_FRAME;
   }
-#endif
+#else
   frame_type = od_ec_dec_uint(&dec->ec, 3, "flags");
+  mbctx.is_keyframe = (frame_type == OD_I_FRAME);
+#endif
   printf("frame# : dec order %06ld : frame type ",
    dec->state.enc_order_count);
   OD_PRINT_FRAME_TYPE(frame_type);
   printf("\n");
-  mbctx.is_keyframe = (frame_type == OD_I_FRAME);
   if (frame_type != OD_I_FRAME) {
     mbctx.num_refs = od_ec_dec_uint(&dec->ec, OD_MAX_CODED_REFS, "flags") + 1;
   } else {
@@ -1120,6 +1123,10 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
   mbctx.qm = od_ec_decode_bool_q15(&dec->ec, 16384, "flags");
   mbctx.use_haar_wavelet = od_ec_decode_bool_q15(&dec->ec, 16384, "flags");
   mbctx.is_golden_frame = od_ec_decode_bool_q15(&dec->ec, 16384, "flags");
+  printf("  use_activity_masking = %d, qm = %d, is_golden_frame = %d\n",
+   mbctx.use_activity_masking, mbctx.qm, mbctx.is_golden_frame);
+  printf(" bits so far = %.3f - after is_golden_frame().\n",
+   (float)od_ec_dec_tell_frac(&dec->ec)/8);
   if (mbctx.is_keyframe) {
     int nplanes;
     int pli;
@@ -1130,6 +1137,8 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
         dec->state.pvq_qm_q4[pli][i] = od_ec_dec_bits(&dec->ec, 8, "qm");
       }
     }
+    printf(" bits so far = %.3f - after pvq_qm_q4().\n",
+     (float)od_ec_dec_tell_frac(&dec->ec)/8);
   }
   /*Update the reference buffer state.*/
   if (OD_NUM_B_FRAMES != 0 && frame_type == OD_P_FRAME) {
@@ -1162,6 +1171,8 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
 #if 1
   if (!mbctx.is_keyframe) {
     od_dec_mv_unpack(dec, mbctx.num_refs);
+    printf(" bits so far = %.3f - after od_dec_mv_unpack().\n",
+     (float)od_ec_dec_tell_frac(&dec->ec)/8);
     od_state_mc_predict(&dec->state);
     if (dec->user_mc_img != NULL) {
       od_img_copy(dec->user_mc_img,
@@ -1169,6 +1180,8 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
     }
   }
   od_decode_coefficients(dec, &mbctx);
+  printf(" bits so far = %.3f. - after od_decode_coefficients().\n",
+   (float)od_ec_dec_tell_frac(&dec->ec)/8);
 #endif
   if (dec->user_bsize != NULL) {
     int j;

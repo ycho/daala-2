@@ -6364,12 +6364,11 @@ void od_mv_est(od_mv_est_ctx *est, int lambda) {
   }
   else
   {
-    if (state->ref_imgi[OD_FRAME_NEXT] >= 0) {
+    /*if (state->ref_imgi[OD_FRAME_NEXT] >= 0) {
       od_mv_est_init_mvs(est, OD_FRAME_NEXT, 0);
-    }
+    }*/
     /*Bidirectional ME.*/
   }
-
   od_mv_est_decimate(est);
   /*This threshold is somewhat arbitrary.
     Chen and Willson use 6000 (with SSD as an error metric).

@@ -2303,16 +2303,19 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   mbctx.use_haar_wavelet = enc->use_haar_wavelet || enc->quality[0] == 0;
   /*Initialize the entropy coder.*/
   od_ec_enc_reset(&enc->ec);
+  printf(" bits so far = %.3f.\n",
+   (float)od_ec_enc_tell_frac(&enc->ec)/8);
   /*Write a bit to mark this as a data packet.*/
   od_ec_encode_bool_q15(&enc->ec, 0, 16384);
-#if 0
+#if 1
   /*Code the keyframe bit.*/
   od_ec_encode_bool_q15(&enc->ec, mbctx.is_keyframe, 16384);
   /*If not I frame, code the bit to tell whether it is P or B frame.*/
   if (!mbctx.is_keyframe)
   	od_ec_encode_bool_q15(&enc->ec, frame_type == OD_B_FRAME, 16384);
-#endif
+#else
   od_ec_enc_uint(&enc->ec, frame_type, 3);
+#endif
   /* Code the number of references. */
   if (frame_type != OD_I_FRAME) {
     od_ec_enc_uint(&enc->ec, mbctx.num_refs - 1, OD_MAX_CODED_REFS);
@@ -2324,6 +2327,8 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   od_ec_encode_bool_q15(&enc->ec, mbctx.qm, 16384);
   od_ec_encode_bool_q15(&enc->ec, mbctx.use_haar_wavelet, 16384);
   od_ec_encode_bool_q15(&enc->ec, mbctx.is_golden_frame, 16384);
+  printf(" bits so far = %.3f - after is_golden_frame.\n",
+   (float)od_ec_enc_tell_frac(&enc->ec)/8);
   for (pli = 0; pli < nplanes; pli++) {
     enc->coded_quantizer[pli] =
      od_quantizer_to_codedquantizer(
@@ -2358,6 +2363,8 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
         od_ec_enc_bits(&enc->ec, enc->state.pvq_qm_q4[pli][i], 8);
       }
     }
+    printf(" bits so far = %.3f - after pvq_qm_q4.\n",
+     (float)od_ec_enc_tell_frac(&enc->ec)/8);
   }
   for (pli = 0; pli < nplanes; pli++) {
     /*Boost the keyframe quality slightly (one coded quantizer
@@ -2381,12 +2388,16 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   if (!mbctx.is_keyframe) {
     od_predict_frame(enc);
     od_encode_mvs(enc, mbctx.num_refs);
+    printf(" bits so far = %.3f - after od_encode_mv().\n",
+     (float)od_ec_enc_tell_frac(&enc->ec)/8);
   }
   /* Enable block size RDO for all but complexity 0 and 1. We might want to
      revise that choice if we get a better open-loop block size algorithm. */
   if (enc->complexity >= 2) od_split_superblocks_rdo(enc, &mbctx);
   else od_split_superblocks(enc, mbctx.is_keyframe);
   od_encode_coefficients(enc, &mbctx, OD_ENCODE_REAL);
+  printf(" bits so far = %.3f - after od_encode_coefficients().\n",
+   (float)od_ec_enc_tell_frac(&enc->ec)/8);
 #endif
   enc->packet_state = OD_PACKET_READY;
 
