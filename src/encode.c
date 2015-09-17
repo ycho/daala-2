@@ -2386,8 +2386,16 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
 #endif
 #if 1
   if (!mbctx.is_keyframe) {
+    int num_refs;
+    num_refs = mbctx.num_refs;
+    /*B frame has three prediction modes while it bases on two references,
+       so, borrowing existing coding methods used by multi-ref.
+       Mode 2 of (i.e. ref in od_mv_grid_pt) means bi-directional prediction.*/
+    /*TODO: Improve it!*/
+    if (frame_type == OD_B_FRAME)
+      num_refs += 1;
     od_predict_frame(enc);
-    od_encode_mvs(enc, mbctx.num_refs);
+    od_encode_mvs(enc, num_refs);
     printf(" bits so far = %.3f - after od_encode_mv().\n",
      (float)od_ec_enc_tell_frac(&enc->ec)/8);
   }

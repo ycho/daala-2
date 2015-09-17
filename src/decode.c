@@ -1170,7 +1170,15 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
   od_adapt_ctx_reset(&dec->state.adapt, mbctx.is_keyframe);
 #if 1
   if (!mbctx.is_keyframe) {
-    od_dec_mv_unpack(dec, mbctx.num_refs);
+    int num_refs;
+    num_refs = mbctx.num_refs;
+    /*B frame has three prediction modes while it bases on two references,
+       so, borrowing existing coding methods used by multi-ref.
+       Mode 2 of (i.e. ref in od_mv_grid_pt) means bi-directional prediction.*/
+    /*TODO: Improve it!*/
+    if (frame_type == OD_B_FRAME)
+      num_refs += 1;
+    od_dec_mv_unpack(dec, num_refs);
     printf(" bits so far = %.3f - after od_dec_mv_unpack().\n",
      (float)od_ec_dec_tell_frac(&dec->ec)/8);
     od_state_mc_predict(&dec->state);
