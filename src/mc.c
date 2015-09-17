@@ -2544,6 +2544,7 @@ int od_state_get_predictor(od_state *state,
   int mvb_sz;
   int ncns;
   int ci;
+  int mv[2];
   ncns = 4;
   mvb_sz = 1 << ((OD_MC_LEVEL_MAX - level) >> 1);
   if (level == 0) {
@@ -2579,8 +2580,15 @@ int od_state_get_predictor(od_state *state,
     }
   }
   for (ci = 0; ci < ncns; ci++) {
-    a[ci][0] = cneighbors[ci]->mv[0];
-    a[ci][1] = cneighbors[ci]->mv[1];
+    /*cneighbors[ci] is backward mv?*/
+    if (state->frame_type == OD_B_FRAME && cneighbors[ci]->ref == 1) {
+      a[ci][0] = -cneighbors[ci]->mv1[0];
+      a[ci][1] = -cneighbors[ci]->mv1[1];
+    }
+    else {
+      a[ci][0] = cneighbors[ci]->mv[0];
+      a[ci][1] = cneighbors[ci]->mv[1];
+    }
 #if defined(OD_ENABLE_LOGGING)
     if (!cneighbors[ci]->valid) {
       OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_ERR,
@@ -2649,8 +2657,16 @@ This last compare is unneeded for a median:
   }
   equal_mvs = 0;
   for (ci = 0; ci < ncns; ci++) {
-    if (pred[0] == OD_DIV_POW2_RE(cneighbors[ci]->mv[0], mv_res) &&
-     pred[1] == OD_DIV_POW2_RE(cneighbors[ci]->mv[1], mv_res)) {
+    if (state->frame_type == OD_B_FRAME && cneighbors[ci]->ref == 1) {
+      mv[0] = - cneighbors[ci]->mv1[0];
+      mv[1] = - cneighbors[ci]->mv1[1];
+    }
+    else {
+      mv[0] = cneighbors[ci]->mv[0];
+      mv[1] = cneighbors[ci]->mv[1];
+    }
+    if (pred[0] == OD_DIV_POW2_RE(mv[0], mv_res) &&
+     pred[1] == OD_DIV_POW2_RE(mv[1], mv_res)) {
       equal_mvs++;
     }
   }

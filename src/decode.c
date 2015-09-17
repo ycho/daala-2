@@ -210,6 +210,25 @@ static void od_decode_mv(daala_dec_ctx *dec, int num_refs, od_mv_grid_pt *mvg,
   if (oy && od_ec_dec_bits(&dec->ec, 1, "mv:sign:y")) oy = -oy;
   mvg->mv[0] = (pred[0] + ox) << mv_res;
   mvg->mv[1] = (pred[1] + oy) << mv_res;
+  /*Bi-directional mv? If so, decode backward mv as well.*/
+  if (dec->state.frame_type == OD_B_FRAME && mvg->ref == 2) {
+    id = od_decode_cdf_adapt(&dec->ec, dec->state.adapt.mv_small_cdf[equal_mvs],
+     16, dec->state.adapt.mv_small_increment, "mv1:low");
+    oy = id >> 2;
+    ox = id & 0x3;
+    if (ox == 3) {
+      ox += generic_decode(&dec->ec, model, width << (3 - mv_res),
+       &dec->state.adapt.mv_ex[level], 6, "mv1:high:x");
+    }
+    if (oy == 3) {
+      oy += generic_decode(&dec->ec, model, height << (3 - mv_res),
+       &dec->state.adapt.mv_ey[level], 6, "mv1:high:y");
+    }
+    if (ox && od_ec_dec_bits(&dec->ec, 1, "mv1:sign:x")) ox = -ox;
+    if (oy && od_ec_dec_bits(&dec->ec, 1, "mv1:sign:y")) oy = -oy;
+    mvg->mv1[0] = (-pred[0] + ox) << mv_res;
+    mvg->mv1[1] = (-pred[1] + oy) << mv_res;
+  }
 }
 
 struct od_mb_dec_ctx {
@@ -1114,6 +1133,7 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
    dec->state.enc_order_count);
   OD_PRINT_FRAME_TYPE(frame_type);
   printf("\n");
+  dec->state.frame_type = frame_type;
   if (frame_type != OD_I_FRAME) {
     mbctx.num_refs = od_ec_dec_uint(&dec->ec, OD_MAX_CODED_REFS, "flags") + 1;
   } else {
