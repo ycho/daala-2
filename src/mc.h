@@ -78,8 +78,8 @@ struct od_mv_grid_pt {
   /*Whether or not this MV actually has a valid value.*/
   unsigned valid:1;
   /*The ref image that this MV points into.*/
-  /*For P frame, maximum 8 references.*/
-  /*For B frame, 0 : previous frame, 1 : next frame, 2 : both frames.*/
+  /*For P frame, 0:golden frame, 1:previous frame. */
+  /*For B frame, 1:previous frame, 2:next frame, 3:both frames.*/
   unsigned ref:3;
 };
 

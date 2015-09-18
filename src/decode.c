@@ -208,10 +208,15 @@ static void od_decode_mv(daala_dec_ctx *dec, int num_refs, od_mv_grid_pt *mvg,
   }
   if (ox && od_ec_dec_bits(&dec->ec, 1, "mv:sign:x")) ox = -ox;
   if (oy && od_ec_dec_bits(&dec->ec, 1, "mv:sign:y")) oy = -oy;
-  mvg->mv[0] = (pred[0] + ox) << mv_res;
-  mvg->mv[1] = (pred[1] + oy) << mv_res;
-  /*Bi-directional mv? If so, decode backward mv as well.*/
   if (dec->state.frame_type == OD_B_FRAME && mvg->ref == 2) {
+    mvg->mv1[0] = (pred[0] + ox) << mv_res;
+    mvg->mv1[1] = (pred[1] + oy) << mv_res;
+  } else {
+    mvg->mv[0] = (pred[0] + ox) << mv_res;
+    mvg->mv[1] = (pred[1] + oy) << mv_res;
+  }
+  /*Bi-directional mv? If so, decode backward mv as well.*/
+  if (dec->state.frame_type == OD_B_FRAME && mvg->ref == 3) {
     id = od_decode_cdf_adapt(&dec->ec, dec->state.adapt.mv_small_cdf[equal_mvs],
      16, dec->state.adapt.mv_small_increment, "mv1:low");
     oy = id >> 2;
@@ -228,6 +233,12 @@ static void od_decode_mv(daala_dec_ctx *dec, int num_refs, od_mv_grid_pt *mvg,
     if (oy && od_ec_dec_bits(&dec->ec, 1, "mv1:sign:y")) oy = -oy;
     mvg->mv1[0] = (-pred[0] + ox) << mv_res;
     mvg->mv1[1] = (-pred[1] + oy) << mv_res;
+  }
+  if (dec->state.frame_type == OD_B_FRAME) {
+    if (mvg->ref != OD_FRAME_NEXT)
+      printf("mvg->ref = %d\n", mvg->ref);
+    printf("pred = (%d,%d), mv = (%d,%d)\n",
+     pred[0], pred[1], mvg->mv1[0], mvg->mv1[1]);
   }
 }
 
@@ -838,6 +849,8 @@ static void od_dec_mv_unpack(daala_dec_ctx *dec, int num_refs) {
     int mvb_sz;
     mvb_sz = 1 << log_mvb_sz;
     /*Odd levels.*/
+    if (dec->state.frame_type == OD_B_FRAME)
+      printf("level %d\n", level);
     for (vy = mvb_sz; vy <= nvmvbs; vy += 2*mvb_sz) {
       for (vx = mvb_sz; vx <= nhmvbs; vx += 2*mvb_sz) {
         OD_ACCOUNTING_SET_LOCATION(dec, OD_ACCT_MV, level, vx, vy);
@@ -858,6 +871,8 @@ static void od_dec_mv_unpack(daala_dec_ctx *dec, int num_refs) {
     }
     level++;
     /*Even Levels.*/
+    if (dec->state.frame_type == OD_B_FRAME)
+      printf("level %d\n", level);
     for (vy = 0; vy <= nvmvbs; vy += mvb_sz) {
       for (vx = mvb_sz*!(vy & mvb_sz); vx <= nhmvbs; vx += 2*mvb_sz) {
         OD_ACCOUNTING_SET_LOCATION(dec, OD_ACCT_MV, level, vx, vy);
@@ -1197,7 +1212,7 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
        Mode 2 of (i.e. ref in od_mv_grid_pt) means bi-directional prediction.*/
     /*TODO: Improve it!*/
     if (frame_type == OD_B_FRAME)
-      num_refs += 1;
+      num_refs = 4;
     od_dec_mv_unpack(dec, num_refs);
     printf(" bits so far = %.3f - after od_dec_mv_unpack().\n",
      (float)od_ec_dec_tell_frac(&dec->ec)/8);
