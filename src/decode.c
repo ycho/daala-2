@@ -247,6 +247,8 @@ static void od_decode_mv(daala_dec_ctx *dec, int num_refs, od_mv_grid_pt *mvg,
   }
 }
 
+/*Block-level decoder context information.
+  Global decoder context information is in od_dec_ctx.*/
 struct od_mb_dec_ctx {
   od_coeff *c;
   od_coeff **d;
@@ -488,12 +490,12 @@ static void od_block_decode(daala_dec_ctx *dec, od_mb_dec_ctx *ctx, int bs,
   int lossless;
   int quant;
   int dc_quant;
-  int use_masking;
+  int use_activity_masking;
   const int *qm;
   OD_ASSERT(bs >= 0 && bs < OD_NBSIZES);
   n = 1 << (bs + 2);
   lossless = (dec->quantizer[pli] == 0);
-  use_masking = ctx->use_activity_masking;
+  use_activity_masking = ctx->use_activity_masking;
   qm = ctx->qm == OD_HVS_QM ? OD_QM8_Q4_HVS : OD_QM8_Q4_FLAT;
   bx <<= bs;
   by <<= bs;
@@ -544,8 +546,8 @@ static void od_block_decode(daala_dec_ctx *dec, od_mb_dec_ctx *ctx, int bs,
   else {
     unsigned int flags;
     od_pvq_decode(dec, predt, pred, quant, pli, bs,
-     OD_PVQ_BETA[use_masking][pli][bs], OD_ROBUST_STREAM, ctx->is_keyframe,
-     &flags, skip);
+     OD_PVQ_BETA[use_activity_masking][pli][bs], OD_ROBUST_STREAM,
+     ctx->is_keyframe, &flags, skip);
     if (pli == 0 && dec->user_flags != NULL) {
       dec->user_flags[by*dec->user_fstride + bx] = flags;
     }
@@ -987,8 +989,8 @@ static void od_decode_coefficients(od_dec_ctx *dec, od_mb_dec_ctx *mbctx) {
     }
   }
   for (pli = 0; pli < nplanes; pli++) {
-    xdec = state->out_imgs[dec->state.curr_dec_frame].planes[pli].xdec;
-    ydec = state->out_imgs[dec->state.curr_dec_frame].planes[pli].ydec;
+    xdec = state->out_imgs[state->curr_dec_frame].planes[pli].xdec;
+    ydec = state->out_imgs[state->curr_dec_frame].planes[pli].ydec;
     w = frame_width >> xdec;
     h = frame_height >> ydec;
     if (!mbctx->use_haar_wavelet) {
@@ -998,6 +1000,12 @@ static void od_decode_coefficients(od_dec_ctx *dec, od_mb_dec_ctx *mbctx) {
     }
   }
   if (dec->quantizer[0] > 0) {
+    for (pli = 0; pli < nplanes; pli++) {
+      xdec = state->out_imgs[state->curr_dec_frame].planes[pli].xdec;
+      ydec = state->out_imgs[state->curr_dec_frame].planes[pli].ydec;
+      OD_COPY(&state->etmp[pli][0], &state->ctmp[pli][0],
+       nvsb*nhsb*OD_BSIZE_MAX*OD_BSIZE_MAX >> xdec >> ydec);
+    }
     for (sby = 0; sby < nvsb; sby++) {
       for (sbx = 0; sbx < nhsb; sbx++) {
         int filtered;
@@ -1005,29 +1013,30 @@ static void od_decode_coefficients(od_dec_ctx *dec, od_mb_dec_ctx *mbctx) {
         int up;
         int left;
         if (state->sb_skip_flags[sby*nhsb + sbx]) {
-          state->clpf_flags[sby*nhsb + sbx] = 0;
+          state->dering_flags[sby*nhsb + sbx] = 0;
           continue;
         }
         up = 0;
         if (sby > 0) {
-          up = state->clpf_flags[(sby-1)*nhsb + sbx];
+          up = state->dering_flags[(sby - 1)*nhsb + sbx];
         }
         left = 0;
         if (sbx > 0) {
-          left = state->clpf_flags[sby*nhsb + (sbx-1)];
+          left = state->dering_flags[sby*nhsb + (sbx - 1)];
         }
         c = (up << 1) + left;
         filtered = od_decode_cdf_adapt(&dec->ec, state->adapt.clpf_cdf[c], 2,
          state->adapt.clpf_increment, "clp");
-        state->clpf_flags[sby*nhsb + sbx] = filtered;
+        state->dering_flags[sby*nhsb + sbx] = filtered;
         if (filtered) {
           for (pli = 0; pli < nplanes; pli++) {
             od_coeff buf[OD_BSIZE_MAX*OD_BSIZE_MAX];
             od_coeff *output;
             int ln;
             int n;
-            xdec = state->out_imgs[dec->state.curr_dec_frame].planes[pli].xdec;
-            ydec = state->out_imgs[dec->state.curr_dec_frame].planes[pli].ydec;
+            int dir[OD_DERING_NBLOCKS][OD_DERING_NBLOCKS];
+            xdec = state->out_imgs[state->curr_dec_frame].planes[pli].xdec;
+            ydec = state->out_imgs[state->curr_dec_frame].planes[pli].ydec;
             w = frame_width >> xdec;
             h = frame_height >> ydec;
             ln = OD_LOG_BSIZE_MAX - xdec;
@@ -1037,8 +1046,9 @@ static void od_decode_coefficients(od_dec_ctx *dec, od_mb_dec_ctx *mbctx) {
               the input to the filter, but because we look past block edges,
               we do this anyway on the edge pixels. Unfortunately, this limits
               potential parallelism.*/
-            od_clpf(buf, OD_BSIZE_MAX, &state->ctmp[pli][(sby << ln)*w +
-             (sbx << ln)], w, ln, sbx, sby, nhsb, nvsb);
+            od_dering(buf, OD_BSIZE_MAX, &state->etmp[pli][(sby << ln)*w +
+             (sbx << ln)], w, ln, sbx, sby, nhsb, nvsb, dec->quantizer[pli],
+             xdec, dir, pli);
             output = &state->ctmp[pli][(sby << ln)*w + (sbx << ln)];
             for (y = 0; y < n; y++) {
               for (x = 0; x < n; x++) {

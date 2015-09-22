@@ -348,6 +348,10 @@ static int od_state_init_impl(od_state *state, const daala_info *info) {
     if (OD_UNLIKELY(!state->dtmp[pli])) {
       return OD_EFAULT;
     }
+    state->etmp[pli] = (od_coeff *)malloc(w*h*sizeof(*state->etmp[pli]));
+    if (OD_UNLIKELY(!state->etmp[pli])) {
+      return OD_EFAULT;
+    }
     state->mctmp[pli] = (od_coeff *)malloc(w*h*sizeof(*state->mctmp[pli]));
     if (OD_UNLIKELY(!state->mctmp[pli])) {
       return OD_EFAULT;
@@ -392,7 +396,7 @@ static int od_state_init_impl(od_state *state, const daala_info *info) {
   state->dump_tags = 0;
   state->dump_files = 0;
 #endif
-  state->clpf_flags = (unsigned char *)malloc(state->nhsb * state->nvsb);
+  state->dering_flags = (unsigned char *)malloc(state->nhsb * state->nvsb);
   state->sb_skip_flags = (unsigned char *)malloc(state->nhsb * state->nvsb);
   state->sb_q_scaling = (unsigned char *)malloc(state->nhsb * state->nvsb);
   /*Init input buffer related variables.*/
@@ -440,13 +444,14 @@ void od_state_clear(od_state *state) {
     free(state->sb_dc_mem[pli]);
     free(state->ltmp[pli]);
     free(state->dtmp[pli]);
+    free(state->etmp[pli]);
     free(state->ctmp[pli]);
     free(state->mctmp[pli]);
     free(state->mdtmp[pli]);
   }
   free(state->bsize);
   for (pli = 0; pli < 3; pli++) free(state->bskip[pli]);
-  free(state->clpf_flags);
+  free(state->dering_flags);
   free(state->sb_skip_flags);
   free(state->sb_q_scaling);
 }

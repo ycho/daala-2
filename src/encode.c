@@ -321,6 +321,13 @@ int daala_encode_ctl(daala_enc_ctx *enc, int req, void *buf, size_t buf_sz) {
       enc->use_activity_masking = !!*(const int *)buf;
       return OD_SUCCESS;
     }
+    case OD_SET_USE_DERING: {
+      OD_ASSERT(enc);
+      OD_ASSERT(buf);
+      OD_ASSERT(buf_sz == sizeof(enc->use_dering));
+      enc->use_dering = !!*(const int *)buf;
+      return OD_SUCCESS;
+    }
     case OD_SET_QM: {
       int qm;
       OD_ASSERT(enc);
@@ -442,6 +449,8 @@ static void od_img_plane_copy_pad8(od_img_plane *dst_p,
   }
 }
 
+/*Block-level encoder context information.
+  Global encoder context information is in od_enc_ctx.*/
 struct od_mb_enc_ctx {
   od_coeff *c;
   od_coeff **d;
@@ -1875,6 +1884,14 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
     }
   }
   if (!rdo_only && enc->quantizer[0] > 0) {
+    /* We copy ctmp to dtmp so we can use it as an unmodified input
+       and avoid filtering some pixels twice. */
+    for (pli = 0; pli < nplanes; pli++) {
+      xdec = state->in_imgs[state->curr_frame].planes[pli].xdec;
+      ydec = state->in_imgs[state->curr_frame].planes[pli].ydec;
+      OD_COPY(&state->etmp[pli][0], &state->ctmp[pli][0],
+       nvsb*nhsb*OD_BSIZE_MAX*OD_BSIZE_MAX >> xdec >> ydec);
+    }
     for (sby = 0; sby < nvsb; sby++) {
       for (sbx = 0; sbx < nhsb; sbx++) {
         int ln;
@@ -1892,8 +1909,11 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
         int q2;
         double filtered_rate;
         double unfiltered_rate;
-        if (state->sb_skip_flags[sby*nhsb + sbx]) {
-          state->clpf_flags[sby*nhsb + sbx] = 0;
+        int dir[OD_DERING_NBLOCKS][OD_DERING_NBLOCKS];
+        /*Disable the dering filter if either 1) manually disabled by
+	   configuration or 2) sb_skip_flags is active for this block.*/
+        if (!enc->use_dering || state->sb_skip_flags[sby*nhsb + sbx]) {
+          state->dering_flags[sby*nhsb + sbx] = 0;
           continue;
         }
         pli = 0;
@@ -1902,8 +1922,9 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
         OD_ASSERT(xdec == state->in_imgs[state->curr_frame].planes[pli].ydec);
         ln = OD_LOG_BSIZE_MAX - xdec;
         n = 1 << ln;
-        od_clpf(buf, OD_BSIZE_MAX, &state->ctmp[pli][(sby << ln)*w +
-         (sbx << ln)], w, ln, sbx, sby, nhsb, nvsb);
+        od_dering(buf, OD_BSIZE_MAX, &state->etmp[pli][(sby << ln)*w +
+         (sbx << ln)], w, ln, sbx, sby, nhsb, nvsb, enc->quantizer[0], xdec,
+         dir, pli);
         ystride = state->in_imgs[state->curr_frame].planes[pli].ystride;
         input = (unsigned char *)&state->in_imgs[state->curr_frame].planes[pli].
          data[(sby << ln)*ystride + (sbx << ln)];
@@ -1942,11 +1963,11 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
 #endif
         up = 0;
         if (sby > 0) {
-          up = state->clpf_flags[(sby-1)*nhsb + sbx];
+          up = state->dering_flags[(sby - 1)*nhsb + sbx];
         }
         left = 0;
         if (sbx > 0) {
-          left = state->clpf_flags[sby*nhsb + (sbx-1)];
+          left = state->dering_flags[sby*nhsb + (sbx - 1)];
         }
         c = (up << 1) + left;
         filtered_rate = od_encode_cdf_cost(1, state->adapt.clpf_cdf[c], 2);
@@ -1954,7 +1975,7 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
         q2 = enc->quantizer[0] * enc->quantizer[0];
         filtered = (filtered_error + OD_PVQ_LAMBDA*q2*filtered_rate) <
          (unfiltered_error + OD_PVQ_LAMBDA*q2*unfiltered_rate);
-        state->clpf_flags[sby*nhsb + sbx] = filtered;
+        state->dering_flags[sby*nhsb + sbx] = filtered;
         od_encode_cdf_adapt(&enc->ec, filtered, state->adapt.clpf_cdf[c], 2,
          state->adapt.clpf_increment);
         if (filtered) {
@@ -1968,12 +1989,9 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
             w = frame_width >> xdec;
             ln = OD_LOG_BSIZE_MAX - xdec;
             n = 1 << ln;
-            /*buf is used for output so that we don't use filtered pixels in
-              the input to the filter, but because we look past block edges,
-              we do this anyway on the edge pixels. Unfortunately, this limits
-              potential parallelism.*/
-            od_clpf(buf, OD_BSIZE_MAX, &state->ctmp[pli][(sby << ln)*w +
-             (sbx << ln)], w, ln, sbx, sby, nhsb, nvsb);
+            od_dering(buf, OD_BSIZE_MAX, &state->etmp[pli][(sby << ln)*w +
+             (sbx << ln)], w, ln, sbx, sby, nhsb, nvsb, enc->quantizer[pli],
+             xdec, dir, pli);
             output = &state->ctmp[pli][(sby << ln)*w + (sbx << ln)];
             for (y = 0; y < n; y++) {
               for (x = 0; x < n; x++) {
