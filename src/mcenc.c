@@ -2827,6 +2827,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
       }
       /*Use the same threshold for Set C as in Set B.*/
       OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG, "Threshold: %i", t2));
+      /*if (!ref == OD_FRAME_NEXT)*/
       if (best_sad > t2) {
         const int *pattern;
         int mvstate;
@@ -2925,7 +2926,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
   /* FOR DEBUG : ALWAYS CHOOSE FORWARD MODE. */
   /*if (state->frame_type == OD_B_FRAME && ref == OD_FRAME_NEXT)
      previous_cost = 0;*/
-#if 1
+#if 0
   /*Backward prediction?*/
   if (state->frame_type == OD_B_FRAME && ref == OD_FRAME_NEXT) {
   /*Do bi-directional MC prediction here,
@@ -2962,8 +2963,6 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
       mvg->mv[1] = mvy0 << 3;
       mvg->mv1[0] = mvx1 << 3;
       mvg->mv1[1] = mvy1 << 3;
-      /*mvg->mv1[0] = 0;
-      mvg->mv1[1] = 0;*/
       /*Mark as 'bi-directionally' predicted.*/
       mvg->ref = 3;
       mvg->valid = 1;
@@ -2976,6 +2975,10 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
     best_cost = 0;
   }
 #endif
+
+  /* FOR DEBUG : ALWAYS CHOOSE BACKWARD MODE. */
+  best_cost = 0;
+
   if (must_update || (best_cost < previous_cost)) {
     OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
      "Found a better SAD then previous best."));
@@ -2984,8 +2987,13 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
     if (state->frame_type == OD_B_FRAME && ref == OD_FRAME_NEXT) {
       mvg->mv1[0] = best_vec[0] << 3;
       mvg->mv1[1] = best_vec[1] << 3;
-      /*mvg->mv1[0] = 0;
-      mvg->mv1[1] = 0;*/
+#if 1 /*FIXME: Still don't know the reason, but this block of codes is required
+         if backward prediction mode is chosen in B-frame.*/
+      mvg->mv[0] = 0;
+      mvg->mv[1] = 0;
+      mv->bma_mvs[0][OD_FRAME_PREV][0] = 0;
+      mv->bma_mvs[0][OD_FRAME_PREV][1] = 0;
+#endif
     }
     else {
       mvg->mv[0] = best_vec[0] << 3;
@@ -6243,7 +6251,8 @@ void od_mv_subpel_refine(od_mv_est_ctx *est, int cost_thresh) {
   /*Save the fullpell MVs now for use by EPZS^2 on the next frame.
     We could also try rounding the results after refinement, I guess.
     I'm not sure it makes much difference*/
-  od_mv_est_update_fullpel_mvs(est);
+  /*NOTE: do this outside of this function.*/
+  /*od_mv_est_update_fullpel_mvs(est);*/
   complexity = est->enc->complexity;
   if (complexity >= OD_MC_SQUARE_SUBPEL_REFINEMENT_COMPLEXITY) {
     pattern_nsites = OD_SQUARE_NSITES;
@@ -6383,6 +6392,7 @@ void od_mv_est(od_mv_est_ctx *est, int lambda) {
     }
   }
   od_mv_est_decimate(est);
+#if 0
   /*This threshold is somewhat arbitrary.
     Chen and Willson use 6000 (with SSD as an error metric).
     We would like something more dependent on the frame size.
@@ -6433,6 +6443,12 @@ void od_mv_est(od_mv_est_ctx *est, int lambda) {
       }
     }
   }
+#endif
+  od_mv_est_update_fullpel_mvs(est);
+#if 0
   od_mv_subpel_refine(est, cost_thresh);
+#else
+  od_state_set_mv_res(state, 2);/*FOR DEBUGGING ONLY.*/
+#endif
   od_restore_fpu(state);
 }

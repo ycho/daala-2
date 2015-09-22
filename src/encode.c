@@ -1435,6 +1435,10 @@ static void od_encode_mv(daala_enc_ctx *enc, int num_refs, od_mv_grid_pt *mvg,
   }
   equal_mvs = od_state_get_predictor(&enc->state, pred, vx, vy, level,
    mv_res, mvg->ref);
+#if 0 /*DEBUG*/
+  pred[0] = pred[1] = 0;
+  equal_mvs = 0;
+#endif
   if (enc->state.frame_type == OD_B_FRAME && mvg->ref == 2) {
     ox = (mvg->mv1[0] >> mv_res) - pred[0];
     oy = (mvg->mv1[1] >> mv_res) - pred[1];
@@ -1476,10 +1480,11 @@ static void od_encode_mv(daala_enc_ctx *enc, int num_refs, od_mv_grid_pt *mvg,
     if (abs(oy)) od_ec_enc_bits(&enc->ec, oy < 0, 1);
   }
   if (enc->state.frame_type == OD_B_FRAME) {
-    if (mvg->ref != OD_FRAME_NEXT)
-      printf("mvg->ref = %d\n", mvg->ref);
-    printf("pred = (%d,%d), mv = (%d,%d)\n",
-     pred[0], pred[1], mvg->mv1[0], mvg->mv1[1]);
+    /*if (mvg->ref != OD_FRAME_NEXT)
+      printf("mvg->ref = %d\n", mvg->ref);*/
+    printf("ref = %d, pred = (%4d,%4d), mv0 = (%4d,%4d), mv1 = (%4d,%4d)\n",
+     mvg->ref, pred[0], pred[1],
+     mvg->mv[0], mvg->mv[1], mvg->mv1[0], mvg->mv1[1]);
   }
 }
 
@@ -1653,7 +1658,7 @@ static void od_encode_mvs(daala_enc_ctx *enc, int num_refs) {
     mvb_sz = 1 << log_mvb_sz;
     /*Odd levels.*/
     if (enc->state.frame_type == OD_B_FRAME)
-      printf("level %d\n", level);
+      printf("level %d ---------------\n", level);
     for (vy = mvb_sz; vy <= nvmvbs; vy += 2*mvb_sz) {
       for (vx = mvb_sz; vx <= nhmvbs; vx += 2*mvb_sz) {
         mvp = grid[vy] + vx;
@@ -1677,7 +1682,7 @@ static void od_encode_mvs(daala_enc_ctx *enc, int num_refs) {
     level++;
     /*Even levels.*/
     if (enc->state.frame_type == OD_B_FRAME)
-      printf("level %d\n", level);
+      printf("level %d ---------------\n", level);
     for (vy = 0; vy <= nvmvbs; vy += mvb_sz) {
       for (vx = mvb_sz*!(vy & mvb_sz); vx <= nhmvbs; vx += 2*mvb_sz) {
         mvp = grid[vy] + vx;

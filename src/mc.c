@@ -256,8 +256,8 @@ void od_state_mvs_clear(od_state *state) {
       grid[vx].mv[0] = 0;
       grid[vx].mv[1] = 0;
       /*FIXME: Enabling this corrupt the decoded images.*/
-      /*grid[vx].mv1[0] = 0;
-      grid[vx].mv1[1] = 0;*/
+      grid[vx].mv1[0] = 0;
+      grid[vx].mv1[1] = 0;
     }
   }
 }

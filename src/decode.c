@@ -193,6 +193,10 @@ static void od_decode_mv(daala_dec_ctx *dec, int num_refs, od_mv_grid_pt *mvg,
   }
   equal_mvs = od_state_get_predictor(&dec->state, pred, vx, vy, level,
    mv_res, mvg->ref);
+#if 0 /*DEBUG*/
+  pred[0] = pred[1] = 0;
+  equal_mvs = 0;
+#endif
   model = &dec->state.adapt.mv_model;
   id = od_decode_cdf_adapt(&dec->ec, dec->state.adapt.mv_small_cdf[equal_mvs],
    16, dec->state.adapt.mv_small_increment, "mv:low");
@@ -235,10 +239,11 @@ static void od_decode_mv(daala_dec_ctx *dec, int num_refs, od_mv_grid_pt *mvg,
     mvg->mv1[1] = (-pred[1] + oy) << mv_res;
   }
   if (dec->state.frame_type == OD_B_FRAME) {
-    if (mvg->ref != OD_FRAME_NEXT)
-      printf("mvg->ref = %d\n", mvg->ref);
-    printf("pred = (%d,%d), mv = (%d,%d)\n",
-     pred[0], pred[1], mvg->mv1[0], mvg->mv1[1]);
+    /*if (mvg->ref != OD_FRAME_NEXT)
+      printf("mvg->ref = %d\n", mvg->ref);*/
+    printf("ref = %d, pred = (%4d,%4d), mv0 = (%4d,%4d), mv1 = (%4d,%4d)\n",
+     mvg->ref, pred[0], pred[1],
+     mvg->mv[0], mvg->mv[1], mvg->mv1[0], mvg->mv1[1]);
   }
 }
 
@@ -850,7 +855,7 @@ static void od_dec_mv_unpack(daala_dec_ctx *dec, int num_refs) {
     mvb_sz = 1 << log_mvb_sz;
     /*Odd levels.*/
     if (dec->state.frame_type == OD_B_FRAME)
-      printf("level %d\n", level);
+      printf("level %d ---------------\n", level);
     for (vy = mvb_sz; vy <= nvmvbs; vy += 2*mvb_sz) {
       for (vx = mvb_sz; vx <= nhmvbs; vx += 2*mvb_sz) {
         OD_ACCOUNTING_SET_LOCATION(dec, OD_ACCT_MV, level, vx, vy);
@@ -872,7 +877,7 @@ static void od_dec_mv_unpack(daala_dec_ctx *dec, int num_refs) {
     level++;
     /*Even Levels.*/
     if (dec->state.frame_type == OD_B_FRAME)
-      printf("level %d\n", level);
+      printf("level %d ---------------\n", level);
     for (vy = 0; vy <= nvmvbs; vy += mvb_sz) {
       for (vx = mvb_sz*!(vy & mvb_sz); vx <= nhmvbs; vx += 2*mvb_sz) {
         OD_ACCOUNTING_SET_LOCATION(dec, OD_ACCT_MV, level, vx, vy);
