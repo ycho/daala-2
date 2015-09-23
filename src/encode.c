@@ -1913,13 +1913,16 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
         }
         pli = 0;
         xdec = state->in_imgs[state->curr_frame].planes[pli].xdec;
+        ydec = state->in_imgs[state->curr_frame].planes[pli].ydec;
         w = frame_width >> xdec;
         OD_ASSERT(xdec == state->in_imgs[state->curr_frame].planes[pli].ydec);
         ln = OD_LOG_BSIZE_MAX - xdec;
         n = 1 << ln;
         od_dering(buf, OD_BSIZE_MAX, &state->etmp[pli][(sby << ln)*w +
          (sbx << ln)], w, ln, sbx, sby, nhsb, nvsb, enc->quantizer[0], xdec,
-         dir, pli);
+         dir, pli, &enc->state.bskip[pli]
+         [(sby << (OD_NBSIZES - 1 - ydec))*enc->state.skip_stride
+         + (sbx << (OD_NBSIZES - 1 - xdec))], enc->state.skip_stride);
         ystride = state->in_imgs[state->curr_frame].planes[pli].ystride;
         input = (unsigned char *)&state->in_imgs[state->curr_frame].planes[pli].
          data[(sby << ln)*ystride + (sbx << ln)];
@@ -1981,12 +1984,15 @@ static void od_encode_coefficients(daala_enc_ctx *enc, od_mb_enc_ctx *mbctx,
           }
           for (pli = 1; pli < nplanes; pli++) {
             xdec = state->in_imgs[state->curr_frame].planes[pli].xdec;
+            ydec = state->in_imgs[state->curr_frame].planes[pli].ydec;
             w = frame_width >> xdec;
             ln = OD_LOG_BSIZE_MAX - xdec;
             n = 1 << ln;
             od_dering(buf, OD_BSIZE_MAX, &state->etmp[pli][(sby << ln)*w +
              (sbx << ln)], w, ln, sbx, sby, nhsb, nvsb, enc->quantizer[pli],
-             xdec, dir, pli);
+             xdec, dir, pli, &enc->state.bskip[pli]
+             [(sby << (OD_NBSIZES - 1 - ydec))*enc->state.skip_stride
+             + (sbx << (OD_NBSIZES - 1 - xdec))], enc->state.skip_stride);
             output = &state->ctmp[pli][(sby << ln)*w + (sbx << ln)];
             for (y = 0; y < n; y++) {
               for (x = 0; x < n; x++) {
