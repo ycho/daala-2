@@ -882,7 +882,10 @@ void od_state_pred_block_from_setup(od_state *state,
   od_mv_grid_pt *grid[4];
   int32_t mvx[4];
   int32_t mvy[4];
+  int32_t mvx1[4];
+  int32_t mvy1[4];
   const unsigned char *src[4];
+  const unsigned char *src1[4];
   const int *dxp;
   const int *dyp;
   int x;
@@ -890,6 +893,8 @@ void od_state_pred_block_from_setup(od_state *state,
   int k;
   int xdec;
   int ydec;
+  int bi_predicted;
+  int bipred[4];
   /* Assumes that xdec and ydec are the same on all references. */
   xdec = state->ref_imgs[state->ref_imgi[OD_FRAME_PREV]].planes[pli].xdec;
   ydec = state->ref_imgs[state->ref_imgi[OD_FRAME_PREV]].planes[pli].ydec;
@@ -900,19 +905,52 @@ void od_state_pred_block_from_setup(od_state *state,
     int mvy_;
     grid[k] = state->mv_grid[vy + (dyp[k] << log_mvb_sz)]
      + vx + (dxp[k] << log_mvb_sz);
-    mvx_ = grid[k]->ref == 2 ? grid[k]->mv1[0] : grid[k]->mv[0];
-    mvy_ = grid[k]->ref == 2 ? grid[k]->mv1[1] : grid[k]->mv[1];
+    if (grid[k]->ref == OD_BACKWARD_PRED) {
+      mvx_ = grid[k]->mv1[0];
+      mvy_ = grid[k]->mv1[1];
+    }
+    else {
+      mvx_ = grid[k]->mv[0];
+      mvy_ = grid[k]->mv[1];
+    }
+    mvx_ = grid[k]->ref == OD_BACKWARD_PRED ? grid[k]->mv1[0] : grid[k]->mv[0];
+    mvy_ = grid[k]->ref == OD_BACKWARD_PRED ? grid[k]->mv1[1] : grid[k]->mv[1];
     mvx[k] = (int32_t)OD_DIV_POW2_RE(mvx_, xdec);
     mvy[k] = (int32_t)OD_DIV_POW2_RE(mvy_, ydec);
     iplane = state->ref_imgs[state->ref_imgi[grid[k]->ref]].planes+pli;
     x = vx << (OD_LOG_MVBSIZE_MIN - iplane->xdec);
     y = vy << (OD_LOG_MVBSIZE_MIN - iplane->ydec);
     src[k] = iplane->data + y*iplane->ystride + x;
+    bi_predicted = bipred[k] = (grid[k]->ref == OD_BIDIR_PRED);
   }
-  od_mc_predict8(state, buf, ystride, src,
-   iplane->ystride, mvx, mvy, oc, s,
-   log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane->xdec,
-   log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane->ydec);
+  /*TODO: if any of four mv_grid.ref is bi-directional, i.e. grid[k]->ref,
+     call corresponding new od_mc_predict8_bipred() with 2nd set of mvx1[],
+     mvy1[]. and src1[].*/
+  if (0/*bi_predicted*/) {
+    for (k = 0; k < 4; k++) {
+      int mvx_;
+      int mvy_;
+      grid[k] = state->mv_grid[vy + (dyp[k] << log_mvb_sz)]
+       + vx + (dxp[k] << log_mvb_sz);
+      if (grid[k]->ref == OD_BIDIR_PRED) {
+        mvx1[k] = (int32_t)OD_DIV_POW2_RE(grid[k]->mv1[0], xdec);
+        mvy1[k] = (int32_t)OD_DIV_POW2_RE(grid[k]->mv1[1], ydec);
+        iplane = state->ref_imgs[state->ref_imgi[grid[k]->ref]].planes+pli;
+        x = vx << (OD_LOG_MVBSIZE_MIN - iplane->xdec);
+        y = vy << (OD_LOG_MVBSIZE_MIN - iplane->ydec);
+        src1[k] = iplane->data + y*iplane->ystride + x;
+      }
+    }
+    /*od_mc_predict8_bipred(state, buf, ystride, src, src1,
+     iplane->ystride, mvx, mvy, mvx1, mvy1, oc, s,
+     log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane->xdec,
+     log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane->ydec, bipred);*/
+  }
+  else
+    od_mc_predict8(state, buf, ystride, src,
+     iplane->ystride, mvx, mvy, oc, s,
+     log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane->xdec,
+     log_mvb_sz + OD_LOG_MVBSIZE_MIN - iplane->ydec);
 }
 
 void od_state_pred_block(od_state *state, unsigned char *buf, int ystride,

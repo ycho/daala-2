@@ -2980,13 +2980,15 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
     /*Block matching with Bidirectional prediction.*/
     sad = od_mv_est_bipred_bma_sad8(est, ref, bx, by,
      mvx0, mvy0, mvx1, mvy1, log_mvb_sz);
-    rate0 = od_mv_est_bits(est, equal_mvs,
+    rate0 = od_mv_est_cand_bits(est, equal_mvs,
      mvx0 << 1, mvy0 << 1, pred[0], pred[1], ref, ref_pred);
-    rate1 = od_mv_est_bits(est, equal_mvs,
+    rate1 = od_mv_est_cand_bits(est, equal_mvs,
      mvx1 << 1, mvy1 << 1, pred[0], pred[1], ref, ref_pred);
-    cost = (sad << OD_ERROR_SCALE) + (rate0 + rate1)*est->lambda;
     /* FOR DEBUG : ALWAYS CHOOSE BI-PRED MODE. */
-    /*cost = 0;*/
+    /*sad = 0;
+    rate0 = 0;
+    rate1 = 0;*/
+    cost = (sad << OD_ERROR_SCALE) + (rate0 + rate1)*est->lambda;
     /*Compare bidir and forward predictions.*/
     if (cost < previous_cost) {
       mv->bma_mvs[0][OD_FRAME_NEXT][0] = mvx1;
@@ -2996,7 +2998,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
       mvg->mv1[0] = mvx1 << 3;
       mvg->mv1[1] = mvy1 << 3;
       /*Mark as 'bi-directionally' predicted.*/
-      mvg->ref = 3;
+      mvg->ref = OD_BIDIR_PRED;
       mvg->valid = 1;
       mv->bma_sad = sad;
       mv->mv_rate = rate0 + rate1;
@@ -3004,13 +3006,11 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
       previous_cost = (sad << OD_ERROR_SCALE) + (rate0 + rate1)*est->lambda;
     }
     /* FOR DEBUG : ALWAYS CHOOSE BACKWARD MODE. */
-    best_cost = 0;
+    /*best_cost = 0;*/
   }
 #endif
-
   /* FOR DEBUG : ALWAYS CHOOSE BACKWARD MODE. */
-  best_cost = 0;
-
+  /*best_cost = 0;*/
   if (must_update || (best_cost < previous_cost)) {
     OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
      "Found a better SAD then previous best."));

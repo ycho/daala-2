@@ -1448,7 +1448,7 @@ static void od_encode_mv(daala_enc_ctx *enc, int num_refs, od_mv_grid_pt *mvg,
   pred[0] = pred[1] = 0;
   equal_mvs = 0;
 #endif
-  if (enc->state.frame_type == OD_B_FRAME && mvg->ref == 2) {
+  if (enc->state.frame_type == OD_B_FRAME && mvg->ref == OD_BACKWARD_PRED) {
     ox = (mvg->mv1[0] >> mv_res) - pred[0];
     oy = (mvg->mv1[1] >> mv_res) - pred[1];
   } else {
@@ -1471,7 +1471,7 @@ static void od_encode_mv(daala_enc_ctx *enc, int num_refs, od_mv_grid_pt *mvg,
   if (abs(ox)) od_ec_enc_bits(&enc->ec, ox < 0, 1);
   if (abs(oy)) od_ec_enc_bits(&enc->ec, oy < 0, 1);
   /*Bi-directional mv? If so, encode backward mv as well.*/
-  if (enc->state.frame_type == OD_B_FRAME && mvg->ref == 3) {
+  if (enc->state.frame_type == OD_B_FRAME && mvg->ref == OD_BIDIR_PRED) {
     ox = (mvg->mv1[0] >> mv_res) - -pred[0];
     oy = (mvg->mv1[1] >> mv_res) - -pred[1];
     id = OD_MINI(abs(oy), 3)*4 + OD_MINI(abs(ox), 3);
@@ -2480,20 +2480,20 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   if (OD_NUM_B_FRAMES == 0 || frame_type == OD_B_FRAME ||
    (frame_type == OD_I_FRAME && enc->state.enc_order_count == 0)) {
     enc->state.curr_dec_output = od_get_output_buff_tail(&enc->state);
-    printf("OUTPUT frame %d\n", enc->state.out_imgs_id[enc->state.curr_dec_output]);
+    printf("OUTPUT frame %d (disp order)\n", enc->state.out_imgs_id[enc->state.curr_dec_output]);
     enc->state.out_imgs_id[enc->state.curr_dec_output] = -1;
   } else
   if ((frame_type == OD_P_FRAME || frame_type == OD_I_FRAME) &&
    enc->state.frames_in_out_buff == 2) {
     enc->state.curr_dec_output = od_get_output_buff_head(&enc->state);
-    printf("OUTPUT frame %d\n",
+    printf("OUTPUT frame %d (disp order)\n",
      enc->state.out_imgs_id[enc->state.curr_dec_output]);
     enc->state.out_imgs_id[enc->state.curr_dec_output] = -1;
   } else
   /*Last frame (and it is either P or I (with open GOP)) in the sequence?*/
   if (enc->state.frames_in_buff == 0 && enc->state.frames_in_out_buff > 0) {
     enc->state.curr_dec_output = od_get_output_buff_head(&enc->state);
-    printf("OUTPUT frame %d\n",
+    printf("OUTPUT frame %d (disp order)\n",
      enc->state.out_imgs_id[enc->state.curr_dec_output]);
     enc->state.out_imgs_id[enc->state.curr_dec_output] = -1;
   }
@@ -2508,7 +2508,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
   if (enc->state.frames_in_buff <= 0 && enc->state.frames_in_out_buff == 1)
   {
     enc->state.curr_dec_output = od_get_output_buff_head(&enc->state);
-    printf("OUTPUT frame %d\n",
+    printf("OUTPUT frame %d (disp order)\n",
      enc->state.out_imgs_id[enc->state.curr_dec_output]);
     enc->state.out_imgs_id[enc->state.curr_dec_output] = -1;
     if (enc->state.curr_dec_output >= 0)
