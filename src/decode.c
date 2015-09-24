@@ -1301,13 +1301,10 @@ int daala_decode_packet_in(daala_dec_ctx *dec, od_img *img,
        &dec->state.bsize[dec->state.bstride*j], nhsb*4);
     }
   }
-  od_img_copy(dec->output_img + dec->curr_dec_frame,
-      dec->state.ref_imgs + dec->state.ref_imgi[OD_FRAME_SELF]);
-  if (frame_type != OD_B_FRAME) {
-    ref_img = dec->state.ref_imgs + dec->state.ref_imgi[OD_FRAME_SELF];
-    OD_ASSERT(ref_img);
-    od_img_edge_ext(ref_img);
-  }
+  ref_img = dec->state.ref_imgs + dec->state.ref_imgi[OD_FRAME_SELF];
+  od_img_copy(dec->output_img + dec->curr_dec_frame, ref_img);
+  OD_ASSERT(ref_img);
+  od_img_edge_ext(ref_img);
   /*Determine output frame in output buffer.*/
   if (OD_NUM_B_FRAMES == 0) {
     dec->curr_dec_output = 0;
