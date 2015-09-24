@@ -121,6 +121,48 @@ struct daala_enc_ctx{
   od_coeff block_c_orig[OD_BSIZE_MAX*OD_BSIZE_MAX];
   od_coeff block_mc_orig[OD_BSIZE_MAX*OD_BSIZE_MAX];
   od_coeff block_c_noskip[OD_BSIZE_MAX*OD_BSIZE_MAX];
+  /* Buffer for the input frame, scaled to reference resolution. */
+  od_img input_img[1 + OD_NUM_B_FRAMES];
+  unsigned char *input_img_data;
+  /** Frame counter in encoding order. */
+  int64_t     enc_order_count;
+  /** Frame counter in displaying order. */
+  int64_t     display_order_count;
+  /** Displaying order of current frame being encoded. */
+  int64_t     curr_display_order;
+  /** Current input frame pointer of in_imgs[]. */
+  int           curr_frame;
+  /** Tail pointer of in_imgs[]. */
+  int           in_buff_ptr;
+  /** Head pointer of in_imgs[]. */
+  int           in_buff_head;
+  /** # of frames left in buffer to encode. */
+  int           frames_in_buff;
+  /** Keep the display order of frames in input image buffer. */
+  int           in_imgs_id[1 + OD_NUM_B_FRAMES];
+#if defined(OD_DUMP_IMAGES) || defined(OD_DUMP_RECONS)
+  /** Output images buffer, used as circular queue. */
+  od_img output_img[1 + OD_NUM_B_FRAMES];
+  /** Tail pointer of out_imgs[]. */
+  int           out_buff_ptr;
+  /** Head pointer of out_imgs[]. */
+  int           out_buff_head;
+  /** Current decoded frame pointer of out_imgs[]. */
+  int           curr_dec_frame;
+  /** Current output frame pointer of out_imgs[]. */
+  int           curr_dec_output;
+  /** # of frames left in output buffer to display. */
+  int           frames_in_out_buff;
+  /** Keep the display order of frames in output image buffers. */
+  int           out_imgs_id[1 + OD_NUM_B_FRAMES];
+#endif
+#if defined(OD_DUMP_IMAGES)
+  od_img              vis_img;
+  od_img              tmp_vis_img;
+# if defined(OD_ANIMATE)
+  int                 ani_iter;
+# endif
+#endif
 };
 
 /** Holds important encoder information so we can roll back decisions */
@@ -157,11 +199,11 @@ int od_mc_compute_satd_32x32_c(const unsigned char *src, int systride,
 void od_enc_opt_vtbl_init_c(od_enc_ctx *enc);
 
 # if defined(OD_DUMP_IMAGES)
-void od_img_upsample8(od_state *_state, od_img *_dst, const od_img *_src);
-void od_encode_fill_vis(od_enc_ctx *enc);
-void od_img_draw_line(od_img *_img, int _x0, int _y0, int _x1, int _y1,
- const unsigned char _ycbcr[3]);
-void od_state_draw_mvs(od_state *_state);
+void od_img_upsample8(od_state *state, od_img *dst, const od_img *src);
+void od_encode_fill_vis(daala_enc_ctx *enc);
+void od_img_draw_line(od_img *img, int x0, int y0, int x1, int y1,
+ const unsigned char ycbcr[3]);
+void od_state_draw_mvs(daala_enc_ctx *enc);
 # endif
 
 # if defined(OD_X86ASM)

@@ -59,10 +59,7 @@ extern const int OD_HAAR_QM[2][OD_LOG_BSIZE_MAX];
 /*The current frame.*/
 # define OD_FRAME_SELF (3)
 
-/*The reconstructed I/O frame.*/
-# define OD_FRAME_REC   (0)
-/*The input I/O frame.*/
-# define OD_FRAME_INPUT (0)
+# define OD_FRAME_MAX  (3)
 
 /*Frame types.*/
 # define OD_I_FRAME (0)
@@ -182,45 +179,21 @@ struct od_state{
   int32_t         frame_width;
   int32_t         frame_height;
   /** Buffer for the 4 ref images. */
-  int                 ref_imgi[4];
+  int                 ref_imgi[OD_FRAME_MAX+1];
   /** Pointers to the ref images so one can move them around without coping
       them. */
-  od_img              ref_imgs[4];
-  /** Input and output images buffer, used as circular queue. */
-  od_img              in_imgs[1 + OD_NUM_B_FRAMES];
-  od_img              out_imgs[1 + OD_NUM_B_FRAMES];
+  od_img              ref_imgs[OD_FRAME_MAX+1];
   /* ----------------------------------------------------- */
   /** I,P,B frame type of current frame. */
   int                 frame_type;
-  /** Frame counter in encoding/decoding order. */
-  int64_t     enc_order_count;
-  /** Frame counter in displaying order. */
-  int64_t     display_order_count;
-  /** Displaying order of current frame being encoded. */
-  int64_t     curr_display_order;
   /** Frame delay. */
   int           frame_delay;
-  /** Tail pointer of in_imgs[]. */
-  int           in_buff_ptr;
-  /** Head pointer of in_imgs[]. */
-  int           in_buff_head;
   /** Tail pointer of out_imgs[]. */
   int           out_buff_ptr;
   /** Head pointer of out_imgs[]. */
   int           out_buff_head;
-  /** Current input frame pointer of in_imgs[]. */
-  int           curr_frame;
-  /** Current decoded frame pointer of out_imgs[]. */
-  int           curr_dec_frame;
-  /** Current output frame pointer of out_imgs[]. */
-  int           curr_dec_output;
-  /** # of frames left in buffer to encode. */
-  int           frames_in_buff;
   /** # of frames left in output buffer to display. */
   int           frames_in_out_buff;
-  /** Keep the display order of frames in input and output image buffers. */
-  int           in_imgs_id[1 + OD_NUM_B_FRAMES];
-  int           out_imgs_id[1 + OD_NUM_B_FRAMES];
   /* ----------------------------------------------------- */
   unsigned char *ref_line_buf[8];
   unsigned char *ref_img_data;
@@ -260,13 +233,6 @@ struct od_state{
   int                 dump_tags;
   od_yuv_dumpfile    *dump_files;
 # endif
-# if defined(OD_DUMP_IMAGES)
-  od_img              vis_img;
-  od_img              tmp_vis_img;
-#  if defined(OD_ANIMATE)
-  int                 ani_iter;
-#  endif
-# endif
   od_coeff *ctmp[OD_NPLANES_MAX];
   od_coeff *dtmp[OD_NPLANES_MAX];
   od_coeff *etmp[OD_NPLANES_MAX];
@@ -283,6 +249,8 @@ struct od_state{
   unsigned char *sb_q_scaling;
 };
 
+void *od_aligned_malloc(size_t _sz,size_t _align);
+void od_aligned_free(void *_ptr);
 int od_state_init(od_state *_state, const daala_info *_info);
 void od_state_clear(od_state *_state);
 
@@ -294,7 +262,7 @@ void od_state_pred_block_from_setup(od_state *_state, unsigned char *_buf,
  int _log_mvb_sz);
 void od_state_pred_block(od_state *_state, unsigned char *_buf, int _ystride,
  int _pli, int _vx, int _vy, int _log_mvb_sz);
-void od_state_mc_predict(od_state *_state);
+void od_state_mc_predict(od_state *_state, od_img *dst);
 void od_state_init_border(od_state *_state);
 int od_state_dump_yuv(od_state *_state, od_img *_img, const char *_tag);
 void od_img_edge_ext(od_img* src);
