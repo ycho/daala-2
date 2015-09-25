@@ -1091,6 +1091,7 @@ int od_state_dump_yuv(od_state *state, od_img *img, const char *tag) {
 static const unsigned char OD_YCbCr_BORDER[3] = {113, 72, 137};
 static const unsigned char OD_YCbCr_EDGE[3] = {41, 240, 110};
 static const unsigned char OD_YCbCr_MV[3] = {81, 90, 240};
+static const unsigned char OD_YCbCr_MV1[3] = {81, 0, 0};
 
 void od_img_draw_point(od_img *img, int x, int y,
  const unsigned char ycbcr[3]) {
@@ -1233,14 +1234,29 @@ static void od_state_draw_mvs_block(od_state *state,
        + vx + (dxp[k] << log_mvb_sz);
     }
     for (k = 0; k < 4; k++) {
+      int *mv;
+      unsigned char *color;
       x0 = ((vx + (dxp[k] << log_mvb_sz)) << (OD_LOG_MVBSIZE_MIN + 1))
        + (OD_UMV_PADDING << 1);
       y0 = ((vy + (dyp[k] << log_mvb_sz)) << (OD_LOG_MVBSIZE_MIN + 1))
        + (OD_UMV_PADDING << 1);
       /*od_img_draw_point(&state->vis_img, x0, y0, OD_YCbCr_MV);*/
+      if (grid[k]->ref == OD_BACKWARD_PRED) {
+        mv = grid[k]->mv1;
+        color = OD_YCbCr_MV1;
+      } else {
+        mv = grid[k]->mv;
+        color = OD_YCbCr_MV;
+      }
       od_img_draw_line(&state->vis_img, x0, y0,
-       x0 + OD_DIV_ROUND_POW2(grid[k]->mv[0], 2, 2),
-       y0 + OD_DIV_ROUND_POW2(grid[k]->mv[1], 2, 2), OD_YCbCr_MV);
+       x0 + OD_DIV_ROUND_POW2(mv[0], 2, 2),
+       y0 + OD_DIV_ROUND_POW2(mv[1], 2, 2), color);
+
+      if (grid[k]->ref == OD_BIDIR_PRED) {
+        od_img_draw_line(&state->vis_img, x0, y0,
+         x0 + OD_DIV_ROUND_POW2(grid[k]->mv1[0], 2, 2),
+         y0 + OD_DIV_ROUND_POW2(grid[k]->mv1[1], 2, 2), OD_YCbCr_MV1);
+      }
     }
   }
 }

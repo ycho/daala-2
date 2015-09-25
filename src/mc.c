@@ -255,7 +255,6 @@ void od_state_mvs_clear(od_state *state) {
       grid[vx].valid = 0;
       grid[vx].mv[0] = 0;
       grid[vx].mv[1] = 0;
-      /*FIXME: Enabling this corrupt the decoded images.*/
       grid[vx].mv1[0] = 0;
       grid[vx].mv1[1] = 0;
     }
@@ -2584,8 +2583,7 @@ int od_state_get_predictor(od_state *state,
   }
   for (ci = 0; ci < ncns; ci++) {
     /*cneighbors[ci] is backward mv?*/
-    if (state->frame_type == OD_B_FRAME
-     && cneighbors[ci]->ref == OD_BACKWARD_PRED) {
+    if (cneighbors[ci]->ref == OD_BACKWARD_PRED) {
       a[ci][0] = cneighbors[ci]->mv1[0];
       a[ci][1] = cneighbors[ci]->mv1[1];
     }
@@ -2661,8 +2659,7 @@ This last compare is unneeded for a median:
   }
   equal_mvs = 0;
   for (ci = 0; ci < ncns; ci++) {
-    if (state->frame_type == OD_B_FRAME
-     && cneighbors[ci]->ref == OD_BACKWARD_PRED) {
+    if (cneighbors[ci]->ref == OD_BACKWARD_PRED) {
       mv[0] = cneighbors[ci]->mv1[0];
       mv[1] = cneighbors[ci]->mv1[1];
     }
