@@ -239,7 +239,7 @@ static void od_mc_blend_full8(od_state *state, unsigned char *dst,
    log_xblk_sz, log_yblk_sz);
 }
 
-/* Pulled aut of mcenc so it can be used in decoder as well. */
+/* Pulled out of mcenc so it can be used in decoder as well. */
 /* maybe call od_mv */
 void od_state_mvs_clear(od_state *state) {
   int vx;
@@ -2584,9 +2584,10 @@ int od_state_get_predictor(od_state *state,
   }
   for (ci = 0; ci < ncns; ci++) {
     /*cneighbors[ci] is backward mv?*/
-    if (state->frame_type == OD_B_FRAME && cneighbors[ci]->ref == 2) {
-      a[ci][0] = -cneighbors[ci]->mv1[0];
-      a[ci][1] = -cneighbors[ci]->mv1[1];
+    if (state->frame_type == OD_B_FRAME
+     && cneighbors[ci]->ref == OD_BACKWARD_PRED) {
+      a[ci][0] = cneighbors[ci]->mv1[0];
+      a[ci][1] = cneighbors[ci]->mv1[1];
     }
     else {
       a[ci][0] = cneighbors[ci]->mv[0];
@@ -2660,9 +2661,10 @@ This last compare is unneeded for a median:
   }
   equal_mvs = 0;
   for (ci = 0; ci < ncns; ci++) {
-    if (state->frame_type == OD_B_FRAME && cneighbors[ci]->ref == 2) {
-      mv[0] = - cneighbors[ci]->mv1[0];
-      mv[1] = - cneighbors[ci]->mv1[1];
+    if (state->frame_type == OD_B_FRAME
+     && cneighbors[ci]->ref == OD_BACKWARD_PRED) {
+      mv[0] = cneighbors[ci]->mv1[0];
+      mv[1] = cneighbors[ci]->mv1[1];
     }
     else {
       mv[0] = cneighbors[ci]->mv[0];

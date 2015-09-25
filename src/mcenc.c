@@ -3010,7 +3010,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
   }
 #endif
   /* FOR DEBUG : ALWAYS CHOOSE BACKWARD MODE. */
-  /*best_cost = 0;*/
+  best_cost = 0;
   if (must_update || (best_cost < previous_cost)) {
     OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
      "Found a better SAD then previous best."));
@@ -3020,11 +3020,13 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
       mvg->mv1[0] = best_vec[0] << 3;
       mvg->mv1[1] = best_vec[1] << 3;
 #if 1 /*FIXME: Still don't know the reason, but this block of codes is required
-         if backward prediction mode is chosen in B-frame.*/
+         if backward prediction mode is ever chosen in B-frame.*/
       mvg->mv[0] = 0;
       mvg->mv[1] = 0;
-      mv->bma_mvs[0][OD_FRAME_PREV][0] = 0;
-      mv->bma_mvs[0][OD_FRAME_PREV][1] = 0;
+      /*UPDATE: After adding fix in od_mv_est_update_fullpel_mvs(),
+         below two lines are not needed.*/
+      /*mv->bma_mvs[0][OD_FRAME_PREV][0] = 0;
+      mv->bma_mvs[0][OD_FRAME_PREV][1] = 0;*/
 #endif
     }
     else {
@@ -6137,8 +6139,14 @@ void od_mv_est_update_fullpel_mvs(od_mv_est_ctx *est) {
       mvg = state->mv_grid[vy] + vx;
       if (!mvg->valid) continue;
       mv = est->mvs[vy] + vx;
-      mv->bma_mvs[0][mvg->ref][0] = mvg->mv[0] >> 3;
-      mv->bma_mvs[0][mvg->ref][1] = mvg->mv[1] >> 3;
+      if (mvg->ref == OD_BACKWARD_PRED) {
+        mv->bma_mvs[0][mvg->ref][0] = mvg->mv1[0] >> 3;
+        mv->bma_mvs[0][mvg->ref][1] = mvg->mv1[1] >> 3;
+      }
+      else {
+        mv->bma_mvs[0][mvg->ref][0] = mvg->mv[0] >> 3;
+        mv->bma_mvs[0][mvg->ref][1] = mvg->mv[1] >> 3;
+      }
     }
   }
 }
@@ -6326,6 +6334,7 @@ void od_mv_est(od_mv_est_ctx *est, int lambda) {
   est->level_min = OD_MINI(est->enc->params.mv_level_min,
    est->enc->params.mv_level_max);
   est->level_max = est->enc->params.mv_level_max;
+  od_state_mvs_clear(state);
   /*Rate estimations. Note that this does not depend on the previous frame: at
      this point, the probabilities have been reset by od_adapt_ctx_reset.*/
   for (i = 0; i < 5; i++) {
@@ -6446,10 +6455,11 @@ void od_mv_est(od_mv_est_ctx *est, int lambda) {
     }
   }
 #endif
-  od_mv_est_update_fullpel_mvs(est);
+
 #if 0
   od_mv_subpel_refine(est, cost_thresh);
 #else
+  od_mv_est_update_fullpel_mvs(est);
   od_state_set_mv_res(state, 2);/*FOR DEBUGGING ONLY.*/
 #endif
   od_restore_fpu(state);

@@ -69,7 +69,7 @@ extern const int OD_HAAR_QM[2][OD_LOG_BSIZE_MAX];
 # define OD_P_FRAME (1)
 # define OD_B_FRAME (2)
 
-/*Prediction mode.*/
+/*Prediction modes.*/
 # define OD_FORWARD_PRED (1)
 # define OD_BACKWARD_PRED (2)
 # define OD_BIDIR_PRED (3)

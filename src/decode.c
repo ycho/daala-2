@@ -235,12 +235,10 @@ static void od_decode_mv(daala_dec_ctx *dec, int num_refs, od_mv_grid_pt *mvg,
     }
     if (ox && od_ec_dec_bits(&dec->ec, 1, "mv1:sign:x")) ox = -ox;
     if (oy && od_ec_dec_bits(&dec->ec, 1, "mv1:sign:y")) oy = -oy;
-    mvg->mv1[0] = (-pred[0] + ox) << mv_res;
-    mvg->mv1[1] = (-pred[1] + oy) << mv_res;
+    mvg->mv1[0] = (pred[0] + ox) << mv_res;
+    mvg->mv1[1] = (pred[1] + oy) << mv_res;
   }
   if (dec->state.frame_type == OD_B_FRAME) {
-    /*if (mvg->ref != OD_FRAME_NEXT)
-      printf("mvg->ref = %d\n", mvg->ref);*/
     printf("ref = %d, pred = (%4d,%4d), mv0 = (%4d,%4d), mv1 = (%4d,%4d)\n",
      mvg->ref, pred[0], pred[1],
      mvg->mv[0], mvg->mv[1], mvg->mv1[0], mvg->mv1[1]);
@@ -831,6 +829,8 @@ static void od_dec_mv_unpack(daala_dec_ctx *dec, int num_refs) {
   od_mv_grid_pt **grid;
   uint16_t *cdf;
   OD_ASSERT(dec->state.ref_imgi[OD_FRAME_PREV] >= 0);
+  if (dec->state.frame_type == OD_B_FRAME)
+    OD_ASSERT(dec->state.ref_imgi[OD_FRAME_NEXT] >= 0);
   od_state_mvs_clear(&dec->state);
   nhmvbs = dec->state.nhmvbs;
   nvmvbs = dec->state.nvmvbs;

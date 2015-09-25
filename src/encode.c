@@ -1472,8 +1472,8 @@ static void od_encode_mv(daala_enc_ctx *enc, int num_refs, od_mv_grid_pt *mvg,
   if (abs(oy)) od_ec_enc_bits(&enc->ec, oy < 0, 1);
   /*Bi-directional mv? If so, encode backward mv as well.*/
   if (enc->state.frame_type == OD_B_FRAME && mvg->ref == OD_BIDIR_PRED) {
-    ox = (mvg->mv1[0] >> mv_res) - -pred[0];
-    oy = (mvg->mv1[1] >> mv_res) - -pred[1];
+    ox = (mvg->mv1[0] >> mv_res) - pred[0];
+    oy = (mvg->mv1[1] >> mv_res) - pred[1];
     id = OD_MINI(abs(oy), 3)*4 + OD_MINI(abs(ox), 3);
     od_encode_cdf_adapt(&enc->ec, id, enc->state.adapt.mv_small_cdf[equal_mvs],
      16, enc->state.adapt.mv_small_increment);
@@ -1489,8 +1489,6 @@ static void od_encode_mv(daala_enc_ctx *enc, int num_refs, od_mv_grid_pt *mvg,
     if (abs(oy)) od_ec_enc_bits(&enc->ec, oy < 0, 1);
   }
   if (enc->state.frame_type == OD_B_FRAME) {
-    /*if (mvg->ref != OD_FRAME_NEXT)
-      printf("mvg->ref = %d\n", mvg->ref);*/
     printf("ref = %d, pred = (%4d,%4d), mv0 = (%4d,%4d), mv1 = (%4d,%4d)\n",
      mvg->ref, pred[0], pred[1],
      mvg->mv[0], mvg->mv[1], mvg->mv1[0], mvg->mv1[1]);
