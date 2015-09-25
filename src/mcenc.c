@@ -2960,7 +2960,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
      previous_cost = 0;*/
 #if 0
   /*Backward prediction?*/
-  if (state->frame_type == OD_B_FRAME && ref == OD_FRAME_NEXT) {
+  if (ref == OD_FRAME_NEXT) {
   /*Do bi-directional MC prediction here,
      then compare it with forward MC prediction.*/
     int32_t sad;
@@ -3016,7 +3016,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
      "Found a better SAD then previous best."));
     mv->bma_mvs[0][ref][0] = best_vec[0];
     mv->bma_mvs[0][ref][1] = best_vec[1];
-    if (state->frame_type == OD_B_FRAME && ref == OD_FRAME_NEXT) {
+    if (ref == OD_FRAME_NEXT) {
       mvg->mv1[0] = best_vec[0] << 3;
       mvg->mv1[1] = best_vec[1] << 3;
 #if 1 /*FIXME: Still don't know the reason, but this block of codes is required

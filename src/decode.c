@@ -212,7 +212,7 @@ static void od_decode_mv(daala_dec_ctx *dec, int num_refs, od_mv_grid_pt *mvg,
   }
   if (ox && od_ec_dec_bits(&dec->ec, 1, "mv:sign:x")) ox = -ox;
   if (oy && od_ec_dec_bits(&dec->ec, 1, "mv:sign:y")) oy = -oy;
-  if (dec->state.frame_type == OD_B_FRAME && mvg->ref == OD_BACKWARD_PRED) {
+  if (mvg->ref == OD_BACKWARD_PRED) {
     mvg->mv1[0] = (pred[0] + ox) << mv_res;
     mvg->mv1[1] = (pred[1] + oy) << mv_res;
   } else {
@@ -220,7 +220,7 @@ static void od_decode_mv(daala_dec_ctx *dec, int num_refs, od_mv_grid_pt *mvg,
     mvg->mv[1] = (pred[1] + oy) << mv_res;
   }
   /*Bi-directional mv? If so, decode backward mv as well.*/
-  if (dec->state.frame_type == OD_B_FRAME && mvg->ref == OD_BIDIR_PRED) {
+  if (mvg->ref == OD_BIDIR_PRED) {
     id = od_decode_cdf_adapt(&dec->ec, dec->state.adapt.mv_small_cdf[equal_mvs],
      16, dec->state.adapt.mv_small_increment, "mv1:low");
     oy = id >> 2;
