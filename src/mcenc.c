@@ -3019,7 +3019,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
     if (ref == OD_FRAME_NEXT) {
       mvg->mv1[0] = best_vec[0] << 3;
       mvg->mv1[1] = best_vec[1] << 3;
-#if 1 /*FIXME: Still don't know why I need this,
+#if 0 /*FIXME: Still don't know why I need this,
          but this block of codes is required
          if backward prediction mode is ever chosen in B-frame.*/
       mvg->mv[0] = 0;

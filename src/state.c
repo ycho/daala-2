@@ -130,7 +130,8 @@ static int od_state_ref_imgs_init(od_state *state, int nrefs,
   int y;
   OD_ASSERT(nrefs >= 3);
   OD_ASSERT(nrefs <= 4);
-  OD_ASSERT(nio == 2);
+  OD_ASSERT(n_in == (state->codec_mode ? 0 : 1 + OD_NUM_B_FRAMES));
+  OD_ASSERT(n_out == 1 + OD_NUM_B_FRAMES);
   info = &state->info;
   data_sz = 0;
   /*TODO: Check for overflow before allocating.*/

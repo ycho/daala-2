@@ -2176,8 +2176,8 @@ static void od_add_to_input_buff(od_state *state, od_img *img)
   state->frames_in_buff += 1;
   OD_ASSERT(state->frames_in_buff <= state->frame_delay);
   state->in_buff_ptr = (state->in_buff_ptr + 1) % state->frame_delay;
-  OD_ASSERT(in_buff_ptr >= 0 &&
-   in_buff_ptr < state->frame_delay);
+  OD_ASSERT(state->in_buff_ptr >= 0 &&
+      state->in_buff_ptr < state->frame_delay);
   state->display_order_count += 1;
   state->in_imgs_id[state->in_buff_ptr] = state->display_order_count;
   if (state->frames_in_buff == 1)
