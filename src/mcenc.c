@@ -2239,14 +2239,17 @@ static int od_mv_est_bits(od_mv_est_ctx *est, int vx, int vy, int mv_res) {
   int mv_rate;
   int ref_pred;
   od_mv_grid_pt *mvg;
+  int *mv;
   state = &est->enc->state;
   mvg = state->mv_grid[vy] + vx;
   equal_mvs = od_state_get_predictor(state, pred, vx, vy,
    OD_MC_LEVEL[vy & OD_MVB_MASK][vx & OD_MVB_MASK], mv_res, mvg->ref);
   ref_pred = od_mc_get_ref_predictor(state,  vx, vy,
    OD_MC_LEVEL[vy & OD_MVB_MASK][vx & OD_MVB_MASK]);
+  if (mvg->ref == OD_BACKWARD_PRED) mv = mvg->mv1;
+  else mv = mvg->mv;
   mv_rate = od_mv_est_cand_bits(est, equal_mvs,
-   mvg->mv[0] >> mv_res, mvg->mv[1] >> mv_res, pred[0], pred[1],
+   mv[0] >> mv_res, mv[1] >> mv_res, pred[0], pred[1],
    mvg->ref, ref_pred);
   return mv_rate;
 }
@@ -3010,7 +3013,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
   }
 #endif
   /* FOR DEBUG : ALWAYS CHOOSE BACKWARD MODE. */
-  best_cost = 0;
+  /*best_cost = 0;*/
   if (must_update || (best_cost < previous_cost)) {
     OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
      "Found a better SAD then previous best."));
