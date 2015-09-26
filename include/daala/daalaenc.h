@@ -89,7 +89,7 @@ int daala_encode_ctl(daala_enc_ctx *enc,
  * \param enc A #daala_enc_ctx handle.
  * \param comments The metadata to place in the comment header, when it is
  *                  encoded.
- * \param op A <tt>daala_packet</tt> structure to fill.
+ * \param dp A <tt>daala_packet</tt> structure to fill.
  *           All of the elements of this structure will be set,
  *            including a pointer to the header data.
  *           The memory for the header data is owned by
@@ -123,7 +123,7 @@ int daala_encode_img_in(daala_enc_ctx *enc, od_img *img, int duration,
  *       However, this may be changed in the future.
  * \param enc A #daala_enc_ctx handle.
  *             This ensures that a proper EOS flag is set on the last packet.
- * \param op A <tt>daala_packet</tt> structure to fill.
+ * \param dp A <tt>daala_packet</tt> structure to fill.
  *           All of the elements of this structure will be set, including a
  *            pointer to the video data.
  *           The memory for the video data is owned by <tt>libdaala</tt>.
