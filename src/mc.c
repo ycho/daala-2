@@ -2481,12 +2481,13 @@ void od_mc_predict8(od_state *state, unsigned char *dst,
 }
 
 int od_mc_get_ref_predictor(od_state *state, int vx, int vy, int level) {
-  static const od_mv_grid_pt ZERO_GRID_PT = { {0, 0}, 1, OD_FRAME_PREV};
+  static const od_mv_grid_pt ZERO_GRID_PT
+   = { {0, 0}, {0, 0}, 1, OD_FRAME_PREV};
   int mvb_sz;
   const od_mv_grid_pt *cneighbors[4];
   int ncns;
   int ci;
-  int hist[2] = {0, 0};
+  int hist[4] = {0, 0, 0, 0};
   int max_count = 0;
   int max_ref = OD_FRAME_PREV;
   ncns = 4;
@@ -2526,7 +2527,8 @@ int od_mc_get_ref_predictor(od_state *state, int vx, int vy, int level) {
   }
   for (ci = 0; ci < ncns; ci++) {
     int ref = cneighbors[ci]->ref;
-    OD_ASSERT(ref < 2);
+    if (state->frame_type != OD_B_FRAME) OD_ASSERT(ref < 2);
+    else  OD_ASSERT(ref < 4);
     hist[ref]++;
     if (hist[ref] > max_count) {
       max_ref = ref;
@@ -2539,7 +2541,8 @@ int od_mc_get_ref_predictor(od_state *state, int vx, int vy, int level) {
 /*Gets the predictor for a given MV node at the given MV resolution.*/
 int od_state_get_predictor(od_state *state,
  int pred[2], int vx, int vy, int level, int mv_res, int ref) {
-  static const od_mv_grid_pt ZERO_GRID_PT = { {0, 0}, 1, OD_FRAME_PREV};
+  static const od_mv_grid_pt ZERO_GRID_PT
+   = { {0, 0}, {0, 0}, 1, OD_FRAME_PREV};
   const od_mv_grid_pt *cneighbors[4];
   int a[4][2];
   int equal_mvs;
