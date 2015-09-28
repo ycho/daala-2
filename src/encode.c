@@ -1433,6 +1433,7 @@ static void od_encode_mv(daala_enc_ctx *enc, int num_refs, od_mv_grid_pt *mvg,
   int id;
   int equal_mvs;
   int ref_pred;
+  OD_ASSERT(mvg->ref != OD_BIDIR_PRED);
   if (num_refs > 1) {
     /* Code reference index. */
     ref_pred = od_mc_get_ref_predictor(&enc->state, vx, vy, level);
@@ -1444,10 +1445,6 @@ static void od_encode_mv(daala_enc_ctx *enc, int num_refs, od_mv_grid_pt *mvg,
   }
   equal_mvs = od_state_get_predictor(&enc->state, pred, vx, vy, level,
    mv_res, mvg->ref);
-#if 0 /*DEBUG*/
-  pred[0] = pred[1] = 0;
-  equal_mvs = 0;
-#endif
   if (mvg->ref == OD_BACKWARD_PRED) {
     ox = (mvg->mv1[0] >> mv_res) - pred[0];
     oy = (mvg->mv1[1] >> mv_res) - pred[1];

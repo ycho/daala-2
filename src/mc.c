@@ -260,6 +260,7 @@ void od_state_mvs_clear(od_state *state) {
     }
   }
 }
+
 #if 0
 /*Perform multiresolution bilinear blending.*/
 static void od_mc_blend_multi8(unsigned char *dst, int dystride,
@@ -2481,15 +2482,23 @@ void od_mc_predict8(od_state *state, unsigned char *dst,
 }
 
 int od_mc_get_ref_predictor(od_state *state, int vx, int vy, int level) {
-  static const od_mv_grid_pt ZERO_GRID_PT
+  static const od_mv_grid_pt ZERO_GRID_PT0
    = { {0, 0}, {0, 0}, 1, OD_FRAME_PREV};
-  int mvb_sz;
+  static const od_mv_grid_pt ZERO_GRID_PT1
+   = { {0, 0}, {0, 0}, 1, OD_FRAME_NEXT};
+  od_mv_grid_pt ZERO_GRID_PT;  int mvb_sz;
   const od_mv_grid_pt *cneighbors[4];
   int ncns;
   int ci;
   int hist[4] = {0, 0, 0, 0};
   int max_count = 0;
   int max_ref = OD_FRAME_PREV;
+  int ref;
+  ref = state->mv_grid[vy][vx].ref;
+  if (0/*ref == OD_BACKWARD_PRED*/)
+    memcpy(&ZERO_GRID_PT, &ZERO_GRID_PT1, sizeof(od_mv_grid_pt));
+  else
+    memcpy(&ZERO_GRID_PT, &ZERO_GRID_PT0, sizeof(od_mv_grid_pt));
   ncns = 4;
   mvb_sz = 1 << ((4 - level) >> 1);
   mvb_sz = 1 << ((OD_MC_LEVEL_MAX - level) >> 1);
@@ -2535,14 +2544,18 @@ int od_mc_get_ref_predictor(od_state *state, int vx, int vy, int level) {
       max_count = hist[ref];
     }
   }
+  max_ref = 0;
   return max_ref;
 }
 
 /*Gets the predictor for a given MV node at the given MV resolution.*/
 int od_state_get_predictor(od_state *state,
  int pred[2], int vx, int vy, int level, int mv_res, int ref) {
-  static const od_mv_grid_pt ZERO_GRID_PT
+  static const od_mv_grid_pt ZERO_GRID_PT0
    = { {0, 0}, {0, 0}, 1, OD_FRAME_PREV};
+  static const od_mv_grid_pt ZERO_GRID_PT1
+   = { {0, 0}, {0, 0}, 1, OD_FRAME_NEXT};
+  od_mv_grid_pt ZERO_GRID_PT;
   const od_mv_grid_pt *cneighbors[4];
   int a[4][2];
   int equal_mvs;
@@ -2550,6 +2563,10 @@ int od_state_get_predictor(od_state *state,
   int ncns;
   int ci;
   int mv[2];
+  if (ref == OD_BACKWARD_PRED)
+    memcpy(&ZERO_GRID_PT, &ZERO_GRID_PT1, sizeof(od_mv_grid_pt));
+  else
+    memcpy(&ZERO_GRID_PT, &ZERO_GRID_PT0, sizeof(od_mv_grid_pt));
   ncns = 4;
   mvb_sz = 1 << ((OD_MC_LEVEL_MAX - level) >> 1);
   if (level == 0) {
@@ -2585,6 +2602,8 @@ int od_state_get_predictor(od_state *state,
     }
   }
   for (ci = 0; ci < ncns; ci++) {
+    if (ref == OD_BACKWARD_PRED)
+      OD_ASSERT(cneighbors[ci]->ref == OD_BACKWARD_PRED);
     /*cneighbors[ci] is backward mv?*/
     if (cneighbors[ci]->ref == OD_BACKWARD_PRED) {
       a[ci][0] = cneighbors[ci]->mv1[0];
@@ -2662,6 +2681,8 @@ This last compare is unneeded for a median:
   }
   equal_mvs = 0;
   for (ci = 0; ci < ncns; ci++) {
+    if (ref == OD_BACKWARD_PRED)
+      OD_ASSERT(cneighbors[ci]->ref == OD_BACKWARD_PRED);
     if (cneighbors[ci]->ref == OD_BACKWARD_PRED) {
       mv[0] = cneighbors[ci]->mv1[0];
       mv[1] = cneighbors[ci]->mv1[1];
@@ -2675,6 +2696,9 @@ This last compare is unneeded for a median:
       equal_mvs++;
     }
   }
+  pred[0] = 0;
+  pred[1] = 0;
+  equal_mvs = 0;
   return equal_mvs;
 }
 

@@ -166,7 +166,7 @@ struct od_mv_est_ctx {
   /*The offsets to inflate the second threshold by for each block size.*/
   int thresh2_offs[OD_NMVBSIZES];
   /*The weights used to produce the accelerated MV predictor.*/
-  int32_t mvapw[2][2];
+  int32_t mvapw[3][2];
   /*Flags indicating which MVs have already been tested during the initial
      EPZS^2 pass.*/
   unsigned char hit_cache[OD_MC_SEARCH_RANGE*2][OD_MC_SEARCH_RANGE*2];

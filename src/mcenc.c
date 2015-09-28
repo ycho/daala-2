@@ -3013,7 +3013,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
   }
 #endif
   /* FOR DEBUG : ALWAYS CHOOSE BACKWARD MODE. */
-  /*best_cost = 0;*/
+  best_cost = 0;
   if (must_update || (best_cost < previous_cost)) {
     OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
      "Found a better SAD then previous best."));
@@ -3027,10 +3027,6 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
          if backward prediction mode is ever chosen in B-frame.*/
       mvg->mv[0] = 0;
       mvg->mv[1] = 0;
-      /*UPDATE: After adding fix in od_mv_est_update_fullpel_mvs(),
-         below two lines are not needed.*/
-      /*mv->bma_mvs[0][OD_FRAME_PREV][0] = 0;
-      mv->bma_mvs[0][OD_FRAME_PREV][1] = 0;*/
 #endif
     }
     else {
@@ -3046,10 +3042,18 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
      vx, vy, best_vec[0], best_vec[1], best_sad, ref));
 #if defined(OD_ENABLE_ASSERTIONS) || defined(OD_ENABLE_LOGGING)
     {
-      OD_ASSERT(mvg->mv[0] <= mvxmax << 3);
-      OD_ASSERT(mvg->mv[0] >= mvxmin << 3);
-      OD_ASSERT(mvg->mv[1] <= mvymax << 3);
-      OD_ASSERT(mvg->mv[1] >= mvymin << 3);
+      if (ref == OD_BACKWARD_PRED) {
+        OD_ASSERT(mvg->mv1[0] <= mvxmax << 3);
+        OD_ASSERT(mvg->mv1[0] >= mvxmin << 3);
+        OD_ASSERT(mvg->mv1[1] <= mvymax << 3);
+        OD_ASSERT(mvg->mv1[1] >= mvymin << 3);
+      }
+      else {
+        OD_ASSERT(mvg->mv[0] <= mvxmax << 3);
+        OD_ASSERT(mvg->mv[0] >= mvxmin << 3);
+        OD_ASSERT(mvg->mv[1] <= mvymax << 3);
+        OD_ASSERT(mvg->mv[1] >= mvymin << 3);
+      }
       mv->mv_rate = od_mv_est_bits(est, vx, vy, 2);
       if (mv->mv_rate != best_rate) {
         OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_ERR,
@@ -6379,6 +6383,8 @@ void od_mv_est(od_mv_est_ctx *est, int lambda) {
   est->mvapw[OD_FRAME_PREV][1] = 0x10000;
   est->mvapw[OD_FRAME_GOLD][0] = 0x20000;
   est->mvapw[OD_FRAME_GOLD][1] = 0x10000;
+  est->mvapw[OD_FRAME_NEXT][0] = 0x20000;
+  est->mvapw[OD_FRAME_NEXT][1] = 0x10000;
   /*TODO: Constant velocity predictor weight.*/
 #if defined(OD_DUMP_IMAGES) && defined(OD_ANIMATE)
   /*Set some initial state.

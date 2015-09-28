@@ -181,6 +181,7 @@ static void od_decode_mv(daala_dec_ctx *dec, int num_refs, od_mv_grid_pt *mvg,
   int id;
   int equal_mvs;
   int ref_pred;
+  OD_ASSERT(mvg->ref != OD_BIDIR_PRED);
   if (num_refs > 1) {
     ref_pred = od_mc_get_ref_predictor(&dec->state, vx, vy, level);
     OD_ASSERT(ref_pred >= 0);
@@ -191,12 +192,9 @@ static void od_decode_mv(daala_dec_ctx *dec, int num_refs, od_mv_grid_pt *mvg,
   } else {
     mvg->ref = OD_FRAME_PREV;
   }
+
   equal_mvs = od_state_get_predictor(&dec->state, pred, vx, vy, level,
    mv_res, mvg->ref);
-#if 0 /*DEBUG*/
-  pred[0] = pred[1] = 0;
-  equal_mvs = 0;
-#endif
   model = &dec->state.adapt.mv_model;
   id = od_decode_cdf_adapt(&dec->ec, dec->state.adapt.mv_small_cdf[equal_mvs],
    16, dec->state.adapt.mv_small_increment, "mv:low");
