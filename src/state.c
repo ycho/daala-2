@@ -686,8 +686,6 @@ void od_state_pred_block_from_setup(od_state *state,
      mvy1[]. and src1[].*/
   if (0/*bi_predicted*/) {
     for (k = 0; k < 4; k++) {
-      int mvx_;
-      int mvy_;
       grid[k] = state->mv_grid[vy + (dyp[k] << log_mvb_sz)]
        + vx + (dxp[k] << log_mvb_sz);
       if (grid[k]->ref == OD_BIDIR_PRED) {
