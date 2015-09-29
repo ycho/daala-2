@@ -2593,8 +2593,6 @@ int od_state_get_predictor(od_state *state,
     }
   }
   for (ci = 0; ci < ncns; ci++) {
-    if (ref == OD_BACKWARD_PRED)
-      OD_ASSERT(cneighbors[ci]->ref == OD_BACKWARD_PRED);
     /*cneighbors[ci] is backward mv?*/
     if (cneighbors[ci]->ref == OD_BACKWARD_PRED) {
       a[ci][0] = cneighbors[ci]->mv1[0];
@@ -2672,8 +2670,6 @@ This last compare is unneeded for a median:
   }
   equal_mvs = 0;
   for (ci = 0; ci < ncns; ci++) {
-    if (ref == OD_BACKWARD_PRED)
-      OD_ASSERT(cneighbors[ci]->ref == OD_BACKWARD_PRED);
     if (cneighbors[ci]->ref == OD_BACKWARD_PRED) {
       mv[0] = cneighbors[ci]->mv1[0];
       mv[1] = cneighbors[ci]->mv1[1];
