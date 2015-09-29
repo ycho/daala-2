@@ -2482,23 +2482,15 @@ void od_mc_predict8(od_state *state, unsigned char *dst,
 }
 
 int od_mc_get_ref_predictor(od_state *state, int vx, int vy, int level) {
-  static const od_mv_grid_pt ZERO_GRID_PT0
+  static const od_mv_grid_pt ZERO_GRID_PT
    = { {0, 0}, {0, 0}, 1, OD_FRAME_PREV};
-  static const od_mv_grid_pt ZERO_GRID_PT1
-   = { {0, 0}, {0, 0}, 1, OD_FRAME_NEXT};
-  od_mv_grid_pt ZERO_GRID_PT;  int mvb_sz;
+  int mvb_sz;
   const od_mv_grid_pt *cneighbors[4];
   int ncns;
   int ci;
   int hist[4] = {0, 0, 0, 0};
   int max_count = 0;
   int max_ref = OD_FRAME_PREV;
-  int ref;
-  ref = state->mv_grid[vy][vx].ref;
-  if (0/*ref == OD_BACKWARD_PRED*/)
-    memcpy(&ZERO_GRID_PT, &ZERO_GRID_PT1, sizeof(od_mv_grid_pt));
-  else
-    memcpy(&ZERO_GRID_PT, &ZERO_GRID_PT0, sizeof(od_mv_grid_pt));
   ncns = 4;
   mvb_sz = 1 << ((4 - level) >> 1);
   mvb_sz = 1 << ((OD_MC_LEVEL_MAX - level) >> 1);
@@ -2544,7 +2536,6 @@ int od_mc_get_ref_predictor(od_state *state, int vx, int vy, int level) {
       max_count = hist[ref];
     }
   }
-  max_ref = 0;
   return max_ref;
 }
 
@@ -2696,9 +2687,6 @@ This last compare is unneeded for a median:
       equal_mvs++;
     }
   }
-  pred[0] = 0;
-  pred[1] = 0;
-  equal_mvs = 0;
   return equal_mvs;
 }
 
@@ -2724,10 +2712,23 @@ int od_mv_split_flag_ctx(od_mv_grid_pt **grid, int vx, int vy,int level) {
   }
   split1 = vx >= 2*mvb_sz ? grid[vy][vx - 2*mvb_sz].valid : 0;
   split2 = vy >= 2*mvb_sz ? grid[vy - 2*mvb_sz][vx].valid : 0;
+#if 0
   same1 = v1 != NULL && v2 != NULL
    && (v1->mv[0] == v2->mv[0]) && (v1->mv[1] == v2->mv[1]);
   same2 = v2 != NULL
    && (v2->mv[0] == v3->mv[0]) && (v2->mv[1] == v3->mv[1]);
+#else
+  same1 = v1 != NULL && v2 != NULL
+   && ((v1->ref == OD_BACKWARD_PRED ? v1->mv1[0] : v1->mv[0])
+   == (v2->ref == OD_BACKWARD_PRED ? v2->mv1[0] : v2->mv[0]))
+   && ((v1->ref == OD_BACKWARD_PRED ? v1->mv1[1] : v1->mv[1])
+   == (v2->ref == OD_BACKWARD_PRED ? v2->mv1[1] : v2->mv[1]));
+  same2 = v2 != NULL
+    && ((v2->ref == OD_BACKWARD_PRED ? v2->mv1[0] : v2->mv[0])
+    == (v3->ref == OD_BACKWARD_PRED ? v3->mv1[0] : v3->mv[0]))
+    && ((v2->ref == OD_BACKWARD_PRED ? v2->mv1[1] : v2->mv[1])
+    == (v3->ref == OD_BACKWARD_PRED ? v3->mv1[1] : v3->mv[1]));
+#endif
   return 3*(split1 + split2) + same1 + same2;
 }
 

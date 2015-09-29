@@ -3013,7 +3013,7 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
   }
 #endif
   /* FOR DEBUG : ALWAYS CHOOSE BACKWARD MODE. */
-  best_cost = 0;
+  /*best_cost = 0;*/
   if (must_update || (best_cost < previous_cost)) {
     OD_LOG((OD_LOG_MOTION_ESTIMATION, OD_LOG_DEBUG,
      "Found a better SAD then previous best."));
@@ -3022,12 +3022,6 @@ static void od_mv_est_init_mv(od_mv_est_ctx *est, int ref, int vx, int vy,
     if (ref == OD_FRAME_NEXT) {
       mvg->mv1[0] = best_vec[0] << 3;
       mvg->mv1[1] = best_vec[1] << 3;
-#if 0 /*FIXME: Still don't know why I need this,
-         but this block of codes is required
-         if backward prediction mode is ever chosen in B-frame.*/
-      mvg->mv[0] = 0;
-      mvg->mv[1] = 0;
-#endif
     }
     else {
       mvg->mv[0] = best_vec[0] << 3;
